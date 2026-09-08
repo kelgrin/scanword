@@ -120,16 +120,16 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
       return (
         <div
           ref={containerRef}
-          className={`relative flex flex-col items-center justify-center rounded-sm border transition-all duration-200 cursor-pointer overflow-hidden
+          className={`relative flex flex-col items-center justify-center rounded-sm border transition-all duration-200 cursor-pointer overflow-visible
             ${isWordSolved ? 'bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700' : 'bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-700'}
             ${isActive ? 'ring-2 ring-blue-500 z-10' : ''}
           `}
-          style={{ gridColumn: cell.x + 1, gridRow: cell.y + 1 }}
+          style={{ gridColumn: cell.x + 1, gridRow: cell.y + 1, zIndex: showHoverTooltip ? 100 : undefined }}
           onClick={handleClueClick}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
-          <span className="text-[8px] leading-[1.2] text-gray-700 dark:text-gray-300 text-center px-0.5 overflow-hidden font-medium">
+          <span className="text-[8px] leading-[1.2] text-gray-700 dark:text-gray-300 text-center px-0.5 font-medium">
             {cell.clueText}
           </span>
           <div className="mt-0.5">
