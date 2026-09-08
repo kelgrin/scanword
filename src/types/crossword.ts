@@ -12,6 +12,7 @@ export interface Cell {
   answerLetter?: string;
   userInput: string;
   playerColor?: string;
+  playerId?: string;
 }
 
 export interface Word {

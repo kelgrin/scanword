@@ -15,7 +15,7 @@ interface CrosswordState {
   reset: () => void;
   setActiveCell: (cellId: string | null, wordId?: string) => void;
   setActiveWord: (wordId: string | null) => void;
-  setInput: (cellId: string, value: string, playerColor?: string) => void;
+  setInput: (cellId: string, value: string, playerColor?: string, playerId?: string) => void;
   clearInput: (cellId: string) => void;
   checkWords: () => void;
   getWordCells: (wordId: string) => Cell[];
@@ -93,14 +93,15 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
     set({ activeWordId: wordId });
   },
 
-  setInput: (cellId: string, value: string, playerColor?: string) => {
+  setInput: (cellId: string, value: string, playerColor?: string, playerId?: string) => {
     set((state) => ({
       cells: state.cells.map((cell) =>
         cell.id === cellId 
           ? { 
               ...cell, 
               userInput: value.toUpperCase().slice(-1),
-              playerColor: playerColor || cell.playerColor
+              playerColor: playerColor || cell.playerColor,
+              playerId: playerId || cell.playerId
             } 
           : cell
       ),
@@ -112,7 +113,7 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
   clearInput: (cellId: string) => {
     set((state) => ({
       cells: state.cells.map((cell) =>
-        cell.id === cellId ? { ...cell, userInput: '', playerColor: undefined } : cell
+        cell.id === cellId ? { ...cell, userInput: '', playerColor: undefined, playerId: undefined } : cell
       ),
     }));
   },

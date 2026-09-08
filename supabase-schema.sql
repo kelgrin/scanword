@@ -27,7 +27,7 @@ CREATE TABLE game_state (
   letter TEXT NOT NULL,
   player_color TEXT,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  PRIMARY KEY (room_id, player_id, cell_id)
+  PRIMARY KEY (room_id, cell_id)
 );
 
 -- Таблица чата

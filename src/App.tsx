@@ -87,7 +87,7 @@ function App() {
     // Загружаем начальное состояние
     getRoomLetters(roomId).then((letters) => {
       letters.forEach((letter) => {
-        useCrosswordStore.getState().setInput(letter.cell_id, letter.letter);
+        useCrosswordStore.getState().setInput(letter.cell_id, letter.letter, letter.player_color, letter.player_id);
       });
     });
 
@@ -105,7 +105,8 @@ function App() {
         useCrosswordStore.getState().setInput(
           payload.new.cell_id, 
           payload.new.letter,
-          payload.new.player_color
+          payload.new.player_color,
+          payload.new.player_id
         );
       } else if (payload.eventType === 'DELETE') {
         useCrosswordStore.getState().clearInput(payload.old?.cell_id || '');
@@ -141,11 +142,13 @@ function App() {
           if (cell.userInput !== prevCell.userInput) {
             // Клетка изменилась
             if (cell.userInput) {
-              // Буква добавлена/изменена
+              // Буква добавлена/изменена - сохраняем с playerId
               saveLetter(roomId, playerId, cell.id, cell.userInput, myColor);
             } else {
-              // Буква удалена
-              deleteLetter(roomId, playerId, cell.id);
+              // Буква удалена - только если она принадлежала текущему игроку
+              if (prevCell.playerId === playerId) {
+                deleteLetter(roomId, playerId, cell.id);
+              }
             }
           }
         });
@@ -175,7 +178,7 @@ function App() {
           const currentCell = currentCells.find(c => c.id === letter.cell_id);
           // Обновляем только если буква отличается
           if (currentCell && currentCell.userInput !== letter.letter) {
-            useCrosswordStore.getState().setInput(letter.cell_id, letter.letter, letter.player_color);
+            useCrosswordStore.getState().setInput(letter.cell_id, letter.letter, letter.player_color, letter.player_id);
           }
         });
         
@@ -280,7 +283,7 @@ function App() {
     const { getRoomLetters } = await import('./services/multiplayerApi');
     const letters = await getRoomLetters(roomId);
     letters.forEach((letter) => {
-      useCrosswordStore.getState().setInput(letter.cell_id, letter.letter, letter.player_color);
+      useCrosswordStore.getState().setInput(letter.cell_id, letter.letter, letter.player_color, letter.player_id);
     });
     
     // Синхронизировать игроков
@@ -474,7 +477,7 @@ function App() {
           {/* Grid */}
           <div className="flex-1 flex justify-center min-w-0">
             <DraggableGrid>
-              {crossword && <CrosswordGrid crossword={crossword} playerColor={isMultiplayer ? myColor : undefined} />}
+              {crossword && <CrosswordGrid crossword={crossword} playerColor={isMultiplayer ? myColor : undefined} playerId={isMultiplayer ? playerId || undefined : undefined} />}
             </DraggableGrid>
           </div>
 

@@ -26,6 +26,9 @@ export interface GameState {
   updated_at: string;
 }
 
+// Alias for backward compatibility
+export type GameLetter = GameState;
+
 export interface ChatMessage {
   id: string;
   room_id: string;
@@ -141,7 +144,7 @@ export async function saveLetter(
     letter,
     player_color: playerColor,
     updated_at: new Date().toISOString(),
-  }]);
+  }], { onConflict: 'room_id,cell_id' });
 
   if (error) console.error('Failed to save letter:', error);
 }
