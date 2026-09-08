@@ -1,14 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { CrosswordData } from './types/crossword';
 import { crosswordApi } from './services/crosswordApi';
 import { useCrosswordStore } from './store/crosswordStore';
 import CrosswordGrid from './components/CrosswordGrid';
 import WordList from './components/WordList';
-import { Shuffle, Trophy, Lightbulb } from 'lucide-react';
+import { Shuffle, Trophy, Lightbulb, Timer } from 'lucide-react';
 
 function App() {
   const [crossword, setCrossword] = useState<CrosswordData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const solvedCount = useCrosswordStore((state) => state.getSolvedCount());
   const totalWords = useCrosswordStore((state) => state.words.length);
   const resetStore = useCrosswordStore((state) => state.reset);
@@ -20,8 +22,29 @@ function App() {
     loadCrossword();
   }, []);
 
+  // Timer logic
+  useEffect(() => {
+    if (!loading && crossword) {
+      timerRef.current = setInterval(() => {
+        setElapsedSeconds((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [loading, crossword]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const loadCrossword = async () => {
     setLoading(true);
+    setElapsedSeconds(0);
     const data = await crosswordApi.fetchCrossword('crossword-1');
     setCrossword(data);
     useCrosswordStore.getState().loadCrossword(data);
@@ -30,6 +53,7 @@ function App() {
 
   const generateNew = async () => {
     setLoading(true);
+    setElapsedSeconds(0);
     resetStore();
     const data = await crosswordApi.generateNew();
     setCrossword(data);
@@ -167,11 +191,22 @@ function App() {
       )}
 
       {/* Main content */}
-      <main className="max-w-6xl mx-auto px-4 py-6">
+      <main className="max-w-7xl mx-auto px-4 py-6 overflow-x-hidden">
         <div className="flex flex-col lg:flex-row gap-6">
+          {/* Timer */}
+          <div className="lg:w-20 shrink-0 flex lg:flex-col items-center justify-center gap-2">
+            <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-3 flex flex-col items-center gap-1">
+              <Timer className="w-5 h-5 text-amber-500" />
+              <span className="text-lg font-mono font-bold text-gray-800">
+                {formatTime(elapsedSeconds)}
+              </span>
+              <span className="text-[10px] text-gray-500 uppercase tracking-wide">Время</span>
+            </div>
+          </div>
+
           {/* Grid */}
-          <div className="flex-1 flex justify-center">
-            <div className="overflow-x-auto pb-4">
+          <div className="flex-1 flex justify-center min-w-0">
+            <div className="overflow-auto max-w-full pb-4">
               {crossword && <CrosswordGrid crossword={crossword} />}
             </div>
           </div>
@@ -180,29 +215,6 @@ function App() {
           <aside className="lg:w-72 shrink-0">
             <WordList words={crossword?.words || []} />
           </aside>
-        </div>
-
-        {/* Instructions */}
-        <div className="mt-6 bg-white/60 rounded-xl p-4 text-sm text-gray-600">
-          <h3 className="font-medium text-gray-800 mb-2">Как играть:</h3>
-          <ul className="grid sm:grid-cols-2 gap-2">
-            <li className="flex items-start gap-2">
-              <span className="text-amber-500">•</span>
-              Нажмите на клетку с вопросом — фокус перейдёт на первую букву
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-amber-500">•</span>
-              Вводите буквы — фокус автоматически перемещается
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-amber-500">•</span>
-              Backspace — удаляет букву или переходит назад
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-amber-500">•</span>
-              Tab — переключение между словами
-            </li>
-          </ul>
         </div>
       </main>
     </div>

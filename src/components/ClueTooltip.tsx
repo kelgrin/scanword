@@ -21,35 +21,27 @@ const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) =>
       
       setLoading(true);
       try {
-        // Use CORS proxy to fetch from sinonim.org
-        const query = wordText.toLowerCase();
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://sinonim.org/topic/${query}`)}`;
-        const response = await fetch(proxyUrl);
-        const html = await response.text();
+        const query = wordText;
+        const response = await fetch(
+          `https://ru.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*&srlimit=1`
+        );
+        const data = await response.json();
         
-        // Parse HTML to extract synonyms
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        
-        // Find synonym links
-        const synonymElements = doc.querySelectorAll('a[href*="/topic/"]');
-        const synonyms: string[] = [];
-        
-        synonymElements.forEach((el) => {
-          const synonymText = el.textContent?.trim();
-          if (synonymText && synonymText !== wordText && synonyms.length < 5) {
-            synonyms.push(synonymText);
+        if (data.query?.search?.length > 0) {
+          const title = data.query.search[0].title;
+          const summaryResponse = await fetch(
+            `https://ru.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`
+          );
+          const summaryData = await summaryResponse.json();
+          
+          if (summaryData.extract) {
+            const firstSentence = summaryData.extract.split('.')[0] + '.';
+            setWebInfo(firstSentence);
           }
-        });
-        
-        if (synonyms.length > 0) {
-          setWebInfo(`Синонимы: ${synonyms.join(', ')}`);
-        } else {
-          setWebInfo('Синонимы не найдены');
         }
       } catch (error) {
         console.error('Failed to fetch web info:', error);
-        setWebInfo('Не удалось загрузить информацию');
+        setWebInfo(null);
       } finally {
         setLoading(false);
       }
@@ -124,7 +116,7 @@ const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) =>
             <div className="border-t border-gray-100 pt-2 mt-2">
               <div className="flex items-center gap-1 text-xs text-blue-600 mb-1">
                 <Globe size={10} />
-                <span className="font-medium">Синонимы:</span>
+                <span className="font-medium">Из Википедии:</span>
               </div>
               <p className="text-xs text-gray-600 leading-relaxed">{webInfo}</p>
             </div>
