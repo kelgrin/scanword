@@ -176,18 +176,31 @@ function canPlaceWord(
     ? { x: startX - 1, y: startY }
     : { x: startX, y: startY - 1 };
   if (cluePos.x < 0 || cluePos.x >= gridSize || cluePos.y < 0 || cluePos.y >= gridSize) return false;
-
+  
   // Clue-клетка не должна быть занята буквой
   const clueKey = `${cluePos.x},${cluePos.y}`;
   const clueCell = grid.get(clueKey);
   if (clueCell && clueCell.letter !== null) return false;
-
+  
   // Проверяем, что clue-клетка не занята другой clue-клеткой
   for (const pw of placedWords) {
     const existingClue = getCluePosition(pw);
     if (existingClue.x === cluePos.x && existingClue.y === cluePos.y) return false;
   }
-
+  
+  // ВАЖНО: Проверяем, что clue-клетка не находится в клетке, которая является буквой другого слова
+  // Это предотвращает ситуацию, когда вопрос блокирует букву
+  for (const pw of placedWords) {
+    for (let i = 0; i < pw.word.length; i++) {
+      const { x, y } = pw.direction === 'horizontal'
+        ? { x: pw.startX + i, y: pw.startY }
+        : { x: pw.startX, y: pw.startY + i };
+      if (x === cluePos.x && y === cluePos.y) {
+        // Clue-клетка находится в клетке, которая является буквой другого слова
+        return false;
+      }
+    }
+  }
   // Проверяем каждую клетку слова
   let hasIntersection = false;
   for (let i = 0; i < len; i++) {
@@ -310,9 +323,9 @@ function findPossiblePlacements(
 // ============================================================
 // Основной генератор
 // ============================================================
-export async function generateCrossword(targetWordCount: number = 10): Promise<CrosswordData> {
-  const gridSize = 20; // Достаточно большая сетка для размещения
-  const maxAttempts = 50;
+export async function generateCrossword(targetWordCount: number = 15): Promise<CrosswordData> {
+  const gridSize = 30; // Достаточно большая сетка для размещения 15-20 слов
+  const maxAttempts = 150;
 
   // Загружаем слова из базы данных
   const WORD_POOL = await getWordPool();
