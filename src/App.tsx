@@ -167,11 +167,23 @@ function App() {
         
         // Синхронизировать буквы
         const letters = await getRoomLetters(roomId);
+        const dbCellIds = new Set(letters.map(l => l.cell_id));
+        const currentCells = useCrosswordStore.getState().cells;
+        
+        // Добавляем/обновляем буквы из БД
         letters.forEach((letter) => {
-          const currentCell = useCrosswordStore.getState().cells.find(c => c.id === letter.cell_id);
+          const currentCell = currentCells.find(c => c.id === letter.cell_id);
           // Обновляем только если буква отличается
           if (currentCell && currentCell.userInput !== letter.letter) {
             useCrosswordStore.getState().setInput(letter.cell_id, letter.letter, letter.player_color);
+          }
+        });
+        
+        // Удаляем буквы, которых нет в БД (были удалены другим игроком)
+        currentCells.forEach((cell) => {
+          if (cell.userInput && !dbCellIds.has(cell.id)) {
+            // Эта буква есть локально, но отсутствует в БД - значит её удалили
+            useCrosswordStore.getState().clearInput(cell.id);
           }
         });
         

@@ -111,7 +111,7 @@ const Chat: React.FC<ChatProps> = ({ roomId, playerId, playerName }) => {
     return (
       <button
         onClick={toggleChat}
-        className="fixed bottom-4 left-4 z-50 bg-gradient-to-r from-blue-500 to-purple-600 text-white p-3 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 relative"
+        className="fixed bottom-24 left-4 z-50 bg-gradient-to-r from-blue-500 to-purple-600 text-white p-3 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 relative"
         title="Открыть чат"
       >
         <MessageSquare className="w-6 h-6" />
