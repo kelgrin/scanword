@@ -5,9 +5,11 @@ import { CrosswordData } from '../types/crossword';
 
 interface CrosswordGridProps {
   crossword: CrosswordData;
+  playerColor?: string;
+  playerId?: string;
 }
 
-const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword }) => {
+const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword, playerColor, playerId }) => {
   const cells = useCrosswordStore((s) => s.cells);
   const words = useCrosswordStore((s) => s.words);
   const activeCellId = useCrosswordStore((s) => s.activeCellId);
@@ -108,7 +110,7 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword }) => {
       const letter = value.toUpperCase().slice(-1);
       if (!/[А-ЯЁA-Z]/.test(letter)) return;
 
-      setInput(cellId, letter);
+      setInput(cellId, letter, playerColor, playerId);
 
       // Auto-advance to next EMPTY cell — skip filled cells
       const currentActiveWordId = useCrosswordStore.getState().activeWordId;
@@ -121,7 +123,7 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword }) => {
         }
       }
     },
-    [setInput, getNextEmptyCellInWord, setActiveCell]
+    [setInput, getNextEmptyCellInWord, setActiveCell, playerColor, playerId]
   );
 
   // Handle keyboard events
@@ -140,7 +142,21 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword }) => {
         }
 
         if (cell.userInput !== '') {
-          // Cell has content — clear it and stay on it
+          // Check if this letter belongs to the current player
+          if (playerId && cell.playerId && cell.playerId !== playerId) {
+            // Letter belongs to another player - cannot delete, just move to previous cell
+            if (currentActiveWordId) {
+              let prevCellId = getPrevCellInWord(cellId, currentActiveWordId);
+              while (prevCellId && isCellSolved(prevCellId)) {
+                prevCellId = getPrevCellInWord(prevCellId, currentActiveWordId);
+              }
+              if (prevCellId) {
+                setActiveCell(prevCellId, currentActiveWordId);
+              }
+            }
+            return;
+          }
+          // Cell has content and belongs to current player — clear it
           clearInput(cellId);
         } else if (currentActiveWordId) {
           // Cell is empty — find previous non-solved cell in word
@@ -154,9 +170,21 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword }) => {
           if (prevCellId) {
             const prevCell = cells.find((c) => c.id === prevCellId);
             if (prevCell && prevCell.userInput !== '') {
-              // Previous cell has content — clear it and move to it
-              clearInput(prevCellId);
-              setActiveCell(prevCellId, currentActiveWordId);
+              // Check if previous cell belongs to current player
+              if (playerId && prevCell.playerId && prevCell.playerId !== playerId) {
+                // Previous cell belongs to another player - skip it and continue searching
+                let skipCellId = getPrevCellInWord(prevCellId, currentActiveWordId);
+                while (skipCellId && isCellSolved(skipCellId)) {
+                  skipCellId = getPrevCellInWord(skipCellId, currentActiveWordId);
+                }
+                if (skipCellId) {
+                  setActiveCell(skipCellId, currentActiveWordId);
+                }
+              } else {
+                // Previous cell has content and belongs to current player — clear it and move to it
+                clearInput(prevCellId);
+                setActiveCell(prevCellId, currentActiveWordId);
+              }
             } else {
               // Previous cell is also empty — just move to it
               setActiveCell(prevCellId, currentActiveWordId);

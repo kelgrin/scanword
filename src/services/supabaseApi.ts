@@ -7,7 +7,18 @@ if (!supabaseKey) {
   console.warn('Supabase anon key is not set. Please add VITE_SUPABASE_ANON_KEY to your .env file');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey || '');
+export const supabase = createClient(supabaseUrl, supabaseKey || '', {
+  realtime: {
+    params: {
+      eventsPerSecond: 10,
+    },
+    timeout: 30000,
+  },
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+});
 
 export interface Question {
   id: number;

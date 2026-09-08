@@ -87,7 +87,7 @@ function App() {
     // Загружаем начальное состояние
     getRoomLetters(roomId).then((letters) => {
       letters.forEach((letter) => {
-        useCrosswordStore.getState().setInput(letter.cell_id, letter.letter);
+        useCrosswordStore.getState().setInput(letter.cell_id, letter.letter, letter.player_color, letter.player_id);
       });
     });
 
@@ -102,7 +102,12 @@ function App() {
       if (payload.new.player_id === playerId) return; // Игнорируем свои изменения
       
       if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-        useCrosswordStore.getState().setInput(payload.new.cell_id, payload.new.letter);
+        useCrosswordStore.getState().setInput(
+          payload.new.cell_id, 
+          payload.new.letter,
+          payload.new.player_color,
+          payload.new.player_id
+        );
       } else if (payload.eventType === 'DELETE') {
         useCrosswordStore.getState().clearInput(payload.old?.cell_id || '');
       }
@@ -123,6 +128,80 @@ function App() {
   useEffect(() => {
     localStorage.setItem('playerName', playerName);
   }, [playerName]);
+
+  // Сохраняем изменения в БД при мультиплеере
+  useEffect(() => {
+    if (!isMultiplayer || !roomId || !playerId) return;
+
+    // Подписываемся на изменения в cells
+    const unsubscribe = useCrosswordStore.subscribe((state, prevState) => {
+      if (state.cells !== prevState.cells) {
+        // Находим измененные клетки
+        state.cells.forEach((cell, index) => {
+          const prevCell = prevState.cells[index];
+          if (cell.userInput !== prevCell.userInput) {
+            // Клетка изменилась
+            if (cell.userInput) {
+              // Буква добавлена/изменена - сохраняем с playerId
+              saveLetter(roomId, playerId, cell.id, cell.userInput, myColor);
+            } else {
+              // Буква удалена - только если она принадлежала текущему игроку
+              if (prevCell.playerId === playerId) {
+                deleteLetter(roomId, playerId, cell.id);
+              }
+            }
+          }
+        });
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [isMultiplayer, roomId, playerId, myColor]);
+
+  // Автоматическая синхронизация каждые 1 секунду
+  useEffect(() => {
+    if (!isMultiplayer || !roomId) return;
+
+    const syncInterval = setInterval(async () => {
+      try {
+        const { getRoomLetters, getRoomPlayers } = await import('./services/multiplayerApi');
+        
+        // Синхронизировать буквы
+        const letters = await getRoomLetters(roomId);
+        const dbCellIds = new Set(letters.map(l => l.cell_id));
+        const currentCells = useCrosswordStore.getState().cells;
+        
+        // Добавляем/обновляем буквы из БД
+        letters.forEach((letter) => {
+          const currentCell = currentCells.find(c => c.id === letter.cell_id);
+          // Обновляем только если буква отличается
+          if (currentCell && currentCell.userInput !== letter.letter) {
+            useCrosswordStore.getState().setInput(letter.cell_id, letter.letter, letter.player_color, letter.player_id);
+          }
+        });
+        
+        // Удаляем буквы, которых нет в БД (были удалены другим игроком)
+        currentCells.forEach((cell) => {
+          if (cell.userInput && !dbCellIds.has(cell.id)) {
+            // Эта буква есть локально, но отсутствует в БД - значит её удалили
+            useCrosswordStore.getState().clearInput(cell.id);
+          }
+        });
+        
+        // Синхронизировать игроков
+        const playersList = await getRoomPlayers(roomId);
+        setPlayers(playersList);
+      } catch (error) {
+        console.error('[AutoSync] Error:', error);
+      }
+    }, 1000); // Каждую секунду
+
+    return () => {
+      clearInterval(syncInterval);
+    };
+  }, [isMultiplayer, roomId]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -186,11 +265,31 @@ function App() {
     setLoading(false);
   };
 
-  const handleLeaveMultiplayer = () => {
+  const handleLeaveMultiplayer = async () => {
+    if (roomId && playerId) {
+      const { leaveRoom } = await import('./services/multiplayerApi');
+      await leaveRoom(roomId, playerId);
+    }
     setIsMultiplayer(false);
     setRoomId(null);
     setPlayerId(null);
     setPlayers([]);
+  };
+
+  const handleManualSync = async () => {
+    if (!roomId) return;
+    
+    // Синхронизировать буквы
+    const { getRoomLetters } = await import('./services/multiplayerApi');
+    const letters = await getRoomLetters(roomId);
+    letters.forEach((letter) => {
+      useCrosswordStore.getState().setInput(letter.cell_id, letter.letter, letter.player_color, letter.player_id);
+    });
+    
+    // Синхронизировать игроков
+    const { getRoomPlayers } = await import('./services/multiplayerApi');
+    const playersList = await getRoomPlayers(roomId);
+    setPlayers(playersList);
   };
 
   const isCompleted = totalWords > 0 && solvedCount === totalWords;
@@ -295,12 +394,23 @@ function App() {
 
             {/* Leave multiplayer button */}
             {isMultiplayer && (
-              <button
-                onClick={handleLeaveMultiplayer}
-                className="flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-red-500 to-orange-600 text-white rounded-lg hover:from-red-600 hover:to-orange-700 transition-all shadow-md hover:shadow-lg active:scale-95"
-              >
-                <span className="hidden sm:inline text-sm">Выйти</span>
-              </button>
+              <>
+                <button
+                  onClick={handleManualSync}
+                  className="flex items-center gap-1 px-2 py-1.5 bg-gradient-to-r from-blue-500 to-cyan-600 text-white rounded-lg hover:from-blue-600 hover:to-cyan-700 transition-all shadow-md hover:shadow-lg active:scale-95"
+                  title="Синхронизировать"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+                <button
+                  onClick={handleLeaveMultiplayer}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-red-500 to-orange-600 text-white rounded-lg hover:from-red-600 hover:to-orange-700 transition-all shadow-md hover:shadow-lg active:scale-95"
+                >
+                  <span className="hidden sm:inline text-sm">Выйти</span>
+                </button>
+              </>
             )}
 
             {/* New crossword button */}
@@ -367,7 +477,7 @@ function App() {
           {/* Grid */}
           <div className="flex-1 flex justify-center min-w-0">
             <DraggableGrid>
-              {crossword && <CrosswordGrid crossword={crossword} />}
+              {crossword && <CrosswordGrid crossword={crossword} playerColor={isMultiplayer ? myColor : undefined} playerId={isMultiplayer ? playerId || undefined : undefined} />}
             </DraggableGrid>
           </div>
 
@@ -379,7 +489,7 @@ function App() {
 
         {/* Multiplayer players indicator */}
         {isMultiplayer && players.length > 0 && (
-          <div className="mt-4 flex items-center justify-center gap-2">
+          <div className="mt-4 flex items-center justify-center gap-2 flex-wrap">
             <span className="text-sm text-gray-600 dark:text-gray-400">Игроки:</span>
             {players.map((player) => (
               <div
@@ -391,6 +501,10 @@ function App() {
                 {player.player_id === playerId && ' (вы)'}
               </div>
             ))}
+            <div className="flex items-center gap-1 ml-2">
+              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" title="Синхронизация активна" />
+              <span className="text-xs text-gray-500 dark:text-gray-400">Online</span>
+            </div>
           </div>
         )}
       </main>

@@ -17,21 +17,76 @@ const Chat: React.FC<ChatProps> = ({ roomId, playerId, playerName }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isOpen, setIsOpen] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Загружаем историю сообщений
-    getChatMessages(roomId).then(setMessages);
+    getChatMessages(roomId).then((msgs) => {
+      setMessages(msgs);
+      setIsConnected(true);
+    });
 
     // Подписываемся на новые сообщения
     const subscription = subscribeToChat(roomId, (payload) => {
-      setMessages((prev) => [...prev, payload.new]);
+      setMessages((prev) => {
+        // Avoid duplicates
+        if (prev.some(m => m.id === payload.new.id)) return prev;
+        // Если чат закрыт и сообщение не от нас - увеличиваем счетчик непрочитанных
+        if (!isOpen && payload.new.player_id !== playerId) {
+          setUnreadCount(c => c + 1);
+        }
+        return [...prev, payload.new];
+      });
+      setIsConnected(true);
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [roomId]);
+  }, [roomId, isOpen, playerId]);
+
+  // Автоматическая синхронизация сообщений каждые 2 секунды
+  useEffect(() => {
+    const syncInterval = setInterval(async () => {
+      try {
+        const msgs = await getChatMessages(roomId);
+        setMessages((prev) => {
+          // Находим новые сообщения
+          const newMsgs = msgs.filter(m => !prev.some(pm => pm.id === m.id));
+          if (newMsgs.length > 0) {
+            // Если чат закрыт - увеличиваем счетчик непрочитанных
+            if (!isOpen) {
+              const unreadFromOthers = newMsgs.filter(m => m.player_id !== playerId).length;
+              setUnreadCount(c => c + unreadFromOthers);
+            }
+            return [...prev, ...newMsgs];
+          }
+          return prev;
+        });
+      } catch (error) {
+        console.error('[Chat Sync] Error:', error);
+      }
+    }, 2000);
+
+    return () => {
+      clearInterval(syncInterval);
+    };
+  }, [roomId, isOpen, playerId]);
+
+  const handleManualSync = async () => {
+    const msgs = await getChatMessages(roomId);
+    setMessages(msgs);
+    setUnreadCount(0);
+  };
+
+  const toggleChat = () => {
+    setIsOpen(!isOpen);
+    if (!isOpen) {
+      setUnreadCount(0); // Сбрасываем счетчик при открытии
+    }
+  };
 
   useEffect(() => {
     // Прокрутка к последнему сообщению
@@ -55,11 +110,16 @@ const Chat: React.FC<ChatProps> = ({ roomId, playerId, playerName }) => {
   if (!isOpen) {
     return (
       <button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 left-4 z-50 bg-gradient-to-r from-blue-500 to-purple-600 text-white p-3 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105"
+        onClick={toggleChat}
+        className="fixed bottom-24 left-4 z-50 bg-gradient-to-r from-blue-500 to-purple-600 text-white p-3 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 relative"
         title="Открыть чат"
       >
         <MessageSquare className="w-6 h-6" />
+        {unreadCount > 0 && (
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
       </button>
     );
   }
@@ -70,14 +130,29 @@ const Chat: React.FC<ChatProps> = ({ roomId, playerId, playerName }) => {
       <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-t-lg">
         <div className="flex items-center gap-2">
           <MessageSquare className="w-5 h-5" />
-          <span className="font-semibold">Чат</span>
+          <div>
+            <span className="font-semibold">Чат</span>
+            <div className="text-xs opacity-80">{playerName}</div>
+          </div>
+          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400' : 'bg-yellow-400 animate-pulse'}`} title={isConnected ? 'Подключено' : 'Подключение...'} />
         </div>
-        <button
-          onClick={() => setIsOpen(false)}
-          className="hover:bg-white/20 p-1 rounded transition-colors"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={handleManualSync}
+            className="hover:bg-white/20 p-1 rounded transition-colors"
+            title="Синхронизировать"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+          <button
+            onClick={toggleChat}
+            className="hover:bg-white/20 p-1 rounded transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* Messages */}
