@@ -157,6 +157,37 @@ function App() {
     };
   }, [isMultiplayer, roomId, playerId, myColor]);
 
+  // Автоматическая синхронизация каждые 1 секунду
+  useEffect(() => {
+    if (!isMultiplayer || !roomId) return;
+
+    const syncInterval = setInterval(async () => {
+      try {
+        const { getRoomLetters, getRoomPlayers } = await import('./services/multiplayerApi');
+        
+        // Синхронизировать буквы
+        const letters = await getRoomLetters(roomId);
+        letters.forEach((letter) => {
+          const currentCell = useCrosswordStore.getState().cells.find(c => c.id === letter.cell_id);
+          // Обновляем только если буква отличается
+          if (currentCell && currentCell.userInput !== letter.letter) {
+            useCrosswordStore.getState().setInput(letter.cell_id, letter.letter, letter.player_color);
+          }
+        });
+        
+        // Синхронизировать игроков
+        const playersList = await getRoomPlayers(roomId);
+        setPlayers(playersList);
+      } catch (error) {
+        console.error('[AutoSync] Error:', error);
+      }
+    }, 1000); // Каждую секунду
+
+    return () => {
+      clearInterval(syncInterval);
+    };
+  }, [isMultiplayer, roomId]);
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
