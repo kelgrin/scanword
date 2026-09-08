@@ -17,7 +17,9 @@ interface CellProps {
 const Cell = forwardRef<HTMLInputElement, CellProps>(
   ({ cell, isActive, isInActiveWord, isSolved, onFocus, onInput, onKeyDown }, ref) => {
     const [showTooltip, setShowTooltip] = useState(false);
+    const [showHoverTooltip, setShowHoverTooltip] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
+    const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const words = useCrosswordStore((s) => s.words);
     const getSolvedWordForCell = useCrosswordStore((s) => s.getSolvedWordForCell);
 
@@ -32,6 +34,31 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [showTooltip]);
+
+    // Hover tooltip for clue cells
+    const handleMouseEnter = () => {
+      if (cell.type === 'clue' && cell.clueText) {
+        hoverTimeoutRef.current = setTimeout(() => {
+          setShowHoverTooltip(true);
+        }, 1000);
+      }
+    };
+
+    const handleMouseLeave = () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
+      setShowHoverTooltip(false);
+    };
+
+    useEffect(() => {
+      return () => {
+        if (hoverTimeoutRef.current) {
+          clearTimeout(hoverTimeoutRef.current);
+        }
+      };
+    }, []);
 
     const handleClueClick = () => {
       if (cell.targetWordId) {
@@ -80,7 +107,7 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
     if (cell.type === 'black') {
       return (
         <div
-          className="bg-gray-700 rounded-sm"
+          className="bg-gray-700 dark:bg-gray-900 rounded-sm"
           style={{ gridColumn: cell.x + 1, gridRow: cell.y + 1 }}
         />
       );
@@ -94,13 +121,15 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
         <div
           ref={containerRef}
           className={`relative flex flex-col items-center justify-center rounded-sm border transition-all duration-200 cursor-pointer overflow-hidden
-            ${isWordSolved ? 'bg-green-100 border-green-300' : 'bg-amber-50 border-amber-200'}
+            ${isWordSolved ? 'bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700' : 'bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-700'}
             ${isActive ? 'ring-2 ring-blue-500 z-10' : ''}
           `}
           style={{ gridColumn: cell.x + 1, gridRow: cell.y + 1 }}
           onClick={handleClueClick}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
         >
-          <span className="text-[8px] leading-[1.2] text-gray-700 text-center px-0.5 overflow-hidden font-medium">
+          <span className="text-[8px] leading-[1.2] text-gray-700 dark:text-gray-300 text-center px-0.5 overflow-hidden font-medium">
             {cell.clueText}
           </span>
           <div className="mt-0.5">
@@ -120,6 +149,13 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
               y={cell.y}
             />
           )}
+          {/* Hover tooltip with full clue text */}
+          {showHoverTooltip && !showTooltip && cell.clueText && (
+            <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded-lg shadow-lg whitespace-nowrap max-w-xs">
+              <div className="font-medium">{cell.clueText}</div>
+              <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
+            </div>
+          )}
         </div>
       );
     }
@@ -132,9 +168,9 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
       <div
         ref={containerRef}
         className={`relative flex items-center justify-center rounded-sm border transition-all duration-200
-          ${isSolved ? 'bg-green-100 border-green-300 cursor-pointer' : ''}
-          ${isInActiveWord && !isSolved ? 'bg-yellow-100 border-yellow-300' : ''}
-          ${!isInActiveWord && !isSolved ? 'bg-white border-gray-200' : ''}
+          ${isSolved ? 'bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700 cursor-pointer' : ''}
+          ${isInActiveWord && !isSolved ? 'bg-yellow-100 border-yellow-300 dark:bg-yellow-900/20 dark:border-yellow-700' : ''}
+          ${!isInActiveWord && !isSolved ? 'bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-600' : ''}
           ${isActive && !isSolved ? 'ring-2 ring-blue-500 z-10' : ''}
         `}
         style={{ gridColumn: cell.x + 1, gridRow: cell.y + 1 }}
@@ -156,7 +192,7 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
           tabIndex={isSolved ? -1 : 0}
           maxLength={2}
           className={`w-full h-full text-center text-base font-bold bg-transparent outline-none uppercase
-            ${isSolved ? 'text-green-700 cursor-pointer' : 'text-gray-800 cursor-pointer'}
+            ${isSolved ? 'text-green-700 dark:text-green-400 cursor-pointer' : 'text-gray-800 dark:text-gray-100 cursor-pointer'}
           `}
           autoComplete="off"
           autoCorrect="off"

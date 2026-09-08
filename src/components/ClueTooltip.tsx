@@ -88,43 +88,43 @@ const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) =>
       style={position ? { top: position.top, left: position.left, minWidth: '220px', maxWidth: '300px' } : { visibility: 'hidden' }}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="bg-white rounded-lg shadow-xl border border-gray-200 p-3 relative">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-3 relative transition-colors">
         <button
           onClick={onClose}
-          className="absolute top-1 right-1 p-1 hover:bg-gray-100 rounded-full transition-colors"
+          className="absolute top-1 right-1 p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
         >
-          <X size={14} className="text-gray-500" />
+          <X size={14} className="text-gray-500 dark:text-gray-400" />
         </button>
         
         <div className="pr-5">
-          <p className="text-sm font-medium text-gray-800 mb-1">{text}</p>
+          <p className="text-sm font-medium text-gray-800 dark:text-gray-100 mb-1">{text}</p>
           
           {wordText && (
-            <p className="text-xs text-green-600 font-bold mb-2">
+            <p className="text-xs text-green-600 dark:text-green-400 font-bold mb-2">
               Ответ: {wordText}
             </p>
           )}
           
           {loading && (
-            <div className="flex items-center gap-1 text-xs text-gray-500">
+            <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
               <Loader2 size={12} className="animate-spin" />
               <span>Загрузка информации...</span>
             </div>
           )}
           
           {webInfo && !loading && (
-            <div className="border-t border-gray-100 pt-2 mt-2">
-              <div className="flex items-center gap-1 text-xs text-blue-600 mb-1">
+            <div className="border-t border-gray-100 dark:border-gray-700 pt-2 mt-2">
+              <div className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 mb-1">
                 <Globe size={10} />
                 <span className="font-medium">Из Википедии:</span>
               </div>
-              <p className="text-xs text-gray-600 leading-relaxed">{webInfo}</p>
+              <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">{webInfo}</p>
             </div>
           )}
           
           {!webInfo && !loading && wordText && (
-            <div className="border-t border-gray-100 pt-2 mt-2">
-              <p className="text-xs text-gray-400 italic">Информация недоступна</p>
+            <div className="border-t border-gray-100 dark:border-gray-700 pt-2 mt-2">
+              <p className="text-xs text-gray-400 dark:text-gray-500 italic">Информация недоступна</p>
             </div>
           )}
         </div>
