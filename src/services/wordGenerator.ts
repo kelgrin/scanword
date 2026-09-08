@@ -69,8 +69,8 @@ async function loadWordsFromDB(): Promise<WordEntry[]> {
     if (questions.length > 0) {
       console.log(`Loaded ${questions.length} words from Supabase`);
       return questions.map((q: Question) => ({
-        word: q.word.toUpperCase(),
-        clue: q.clue,
+        word: q.answer.toUpperCase(),
+        clue: q.question,
       }));
     }
   } catch (error) {

@@ -11,8 +11,8 @@ export const supabase = createClient(supabaseUrl, supabaseKey || '');
 
 export interface Question {
   id: number;
-  word: string;
-  clue: string;
+  question: string;
+  answer: string;
   length?: number;
   difficulty?: number;
 }
@@ -28,6 +28,8 @@ export async function getQuestions(count: number = 10): Promise<Question[]> {
     console.error('Error fetching questions:', error);
     return [];
   }
+  
+  if (!data) return [];
   
   // Перемешиваем и берем нужное количество
   const shuffled = data.sort(() => Math.random() - 0.5);
@@ -45,7 +47,7 @@ export async function getAllQuestions(): Promise<Question[]> {
     return [];
   }
   
-  return data;
+  return data || [];
 }
 
 // Получить вопросы определенной длины
@@ -60,7 +62,7 @@ export async function getQuestionsByLength(length: number): Promise<Question[]> 
     return [];
   }
   
-  return data;
+  return data || [];
 }
 
 // Получить вопросы по сложности
@@ -75,5 +77,5 @@ export async function getQuestionsByDifficulty(difficulty: number): Promise<Ques
     return [];
   }
   
-  return data;
+  return data || [];
 }
