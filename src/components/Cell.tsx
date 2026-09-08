@@ -64,7 +64,7 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
 
     const getDirectionIcon = () => {
       if (!cell.direction) return null;
-      const iconSize = 14;
+      const iconSize = 12;
       switch (cell.direction) {
         case 'up':
           return <ArrowUp size={iconSize} className="text-gray-500" />;
@@ -100,7 +100,7 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
           style={{ gridColumn: cell.x + 1, gridRow: cell.y + 1 }}
           onClick={handleClueClick}
         >
-          <span className="text-[9px] leading-[1.3] text-gray-700 text-center px-1 overflow-hidden font-medium">
+          <span className="text-[8px] leading-[1.2] text-gray-700 text-center px-0.5 overflow-hidden font-medium">
             {cell.clueText}
           </span>
           <div className="mt-0.5">
@@ -155,7 +155,7 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
           readOnly={isSolved}
           tabIndex={isSolved ? -1 : 0}
           maxLength={2}
-          className={`w-full h-full text-center text-lg font-bold bg-transparent outline-none uppercase
+          className={`w-full h-full text-center text-base font-bold bg-transparent outline-none uppercase
             ${isSolved ? 'text-green-700 cursor-pointer' : 'text-gray-800 cursor-pointer'}
           `}
           autoComplete="off"
