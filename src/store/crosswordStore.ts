@@ -7,6 +7,7 @@ interface CrosswordState {
   words: Word[];
   activeCellId: string | null;
   activeWordId: string | null;
+  hints: number;
 
   // Actions
   loadCrossword: (data: CrosswordData) => void;
@@ -26,6 +27,9 @@ interface CrosswordState {
   getSolvedCount: () => number;
   getNextCellInWord: (cellId: string, wordId: string) => string | null;
   getPrevCellInWord: (cellId: string, wordId: string) => string | null;
+  getNextEmptyCellInWord: (cellId: string, wordId: string) => string | null;
+  getPrevEmptyCellInWord: (cellId: string, wordId: string) => string | null;
+  useHint: (cellId: string) => boolean;
 }
 
 export const useCrosswordStore = create<CrosswordState>((set, get) => ({
@@ -34,6 +38,7 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
   words: [],
   activeCellId: null,
   activeWordId: null,
+  hints: 5,
 
   loadCrossword: (data: CrosswordData) => {
     set({
@@ -42,6 +47,7 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
       words: data.words,
       activeCellId: null,
       activeWordId: null,
+      hints: 5,
     });
   },
 
@@ -52,6 +58,7 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
       words: [],
       activeCellId: null,
       activeWordId: null,
+      hints: 5,
     });
   },
 
@@ -192,5 +199,61 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
     const idx = word.cells.indexOf(cellId);
     if (idx <= 0) return null;
     return word.cells[idx - 1];
+  },
+
+  getNextEmptyCellInWord: (cellId: string, wordId: string) => {
+    const state = get();
+    const word = state.words.find((w) => w.id === wordId);
+    if (!word) return null;
+    const idx = word.cells.indexOf(cellId);
+    if (idx === -1) return null;
+    
+    // Find next empty cell starting from current position + 1
+    for (let i = idx + 1; i < word.cells.length; i++) {
+      const nextCellId = word.cells[i];
+      const nextCell = state.cells.find((c) => c.id === nextCellId);
+      if (nextCell && nextCell.type === 'empty' && nextCell.userInput === '') {
+        return nextCellId;
+      }
+    }
+    return null;
+  },
+
+  getPrevEmptyCellInWord: (cellId: string, wordId: string) => {
+    const state = get();
+    const word = state.words.find((w) => w.id === wordId);
+    if (!word) return null;
+    const idx = word.cells.indexOf(cellId);
+    if (idx <= 0) return null;
+    
+    // Find previous empty cell starting from current position - 1
+    for (let i = idx - 1; i >= 0; i--) {
+      const prevCellId = word.cells[i];
+      const prevCell = state.cells.find((c) => c.id === prevCellId);
+      if (prevCell && prevCell.type === 'empty' && prevCell.userInput === '') {
+        return prevCellId;
+      }
+    }
+    return null;
+  },
+
+  useHint: (cellId: string) => {
+    const state = get();
+    if (state.hints <= 0) return false;
+    
+    const cell = state.cells.find((c) => c.id === cellId);
+    if (!cell || !cell.answerLetter) return false;
+    
+    // Set the correct letter
+    set((state) => ({
+      cells: state.cells.map((c) =>
+        c.id === cellId ? { ...c, userInput: cell.answerLetter! } : c
+      ),
+      hints: state.hints - 1,
+    }));
+    
+    // Check words after hint
+    setTimeout(() => get().checkWords(), 0);
+    return true;
   },
 }));

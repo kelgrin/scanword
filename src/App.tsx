@@ -4,7 +4,7 @@ import { crosswordApi } from './services/crosswordApi';
 import { useCrosswordStore } from './store/crosswordStore';
 import CrosswordGrid from './components/CrosswordGrid';
 import WordList from './components/WordList';
-import { Shuffle, Trophy, RotateCcw } from 'lucide-react';
+import { Shuffle, Trophy, Lightbulb } from 'lucide-react';
 
 function App() {
   const [crossword, setCrossword] = useState<CrosswordData | null>(null);
@@ -12,6 +12,9 @@ function App() {
   const solvedCount = useCrosswordStore((state) => state.getSolvedCount());
   const totalWords = useCrosswordStore((state) => state.words.length);
   const resetStore = useCrosswordStore((state) => state.reset);
+  const hints = useCrosswordStore((state) => state.hints);
+  const activeCellId = useCrosswordStore((state) => state.activeCellId);
+  const useHint = useCrosswordStore((state) => state.useHint);
 
   useEffect(() => {
     loadCrossword();
@@ -32,6 +35,12 @@ function App() {
     setCrossword(data);
     useCrosswordStore.getState().loadCrossword(data);
     setLoading(false);
+  };
+
+  const handleUseHint = () => {
+    if (hints > 0 && activeCellId) {
+      useHint(activeCellId);
+    }
   };
 
   const isCompleted = totalWords > 0 && solvedCount === totalWords;
@@ -84,6 +93,21 @@ function App() {
               </div>
             </div>
 
+            {/* Hint button */}
+            <button
+              onClick={handleUseHint}
+              disabled={hints <= 0 || !activeCellId}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all shadow-md active:scale-95 ${
+                hints > 0 && activeCellId
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-white hover:from-yellow-500 hover:to-amber-600 hover:shadow-lg'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
+              title={hints > 0 ? 'Показать букву на активной клетке' : 'Подсказки закончились'}
+            >
+              <Lightbulb className="w-4 h-4" />
+              <span className="hidden sm:inline">{hints}</span>
+            </button>
+
             {/* New crossword button */}
             <button
               onClick={generateNew}
@@ -124,7 +148,7 @@ function App() {
             onClick={generateNew}
             className="mt-2 px-4 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 mx-auto"
           >
-            <RotateCcw className="w-4 h-4" />
+            <Shuffle className="w-4 h-4" />
             Новый сканворд
           </button>
         </div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { X, Globe, Loader2 } from 'lucide-react';
 
 interface ClueTooltipProps {
@@ -9,9 +9,11 @@ interface ClueTooltipProps {
   y: number;
 }
 
-const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose, x, y }) => {
+const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) => {
   const [webInfo, setWebInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
     const fetchWebInfo = async () => {
@@ -51,17 +53,42 @@ const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose, x, y
     fetchWebInfo();
   }, [wordText]);
 
+  // Calculate position on mount
+  useEffect(() => {
+    // Find the parent cell element
+    const parentCell = tooltipRef.current?.parentElement;
+    if (parentCell) {
+      const cellRect = parentCell.getBoundingClientRect();
+      const tooltipWidth = 260;
+      const tooltipHeight = 150; // approximate
+      
+      let top = cellRect.top - tooltipHeight - 12;
+      let left = cellRect.left + cellRect.width / 2 - tooltipWidth / 2;
+      
+      // If tooltip goes above viewport, show below
+      if (top < 8) {
+        top = cellRect.bottom + 12;
+      }
+      
+      // If tooltip goes beyond right edge
+      if (left + tooltipWidth > window.innerWidth - 8) {
+        left = window.innerWidth - tooltipWidth - 8;
+      }
+      
+      // If tooltip goes beyond left edge
+      if (left < 8) {
+        left = 8;
+      }
+      
+      setPosition({ top, left });
+    }
+  }, []);
+
   return (
     <div
-      className="absolute z-50 animate-fade-in"
-      style={{
-        left: '50%',
-        transform: 'translateX(-50%)',
-        bottom: '100%',
-        marginBottom: '8px',
-        minWidth: '220px',
-        maxWidth: '300px',
-      }}
+      ref={tooltipRef}
+      className="fixed z-[9999] animate-fade-in"
+      style={position ? { top: position.top, left: position.left, minWidth: '220px', maxWidth: '300px' } : { visibility: 'hidden' }}
       onClick={(e) => e.stopPropagation()}
     >
       <div className="bg-white rounded-lg shadow-xl border border-gray-200 p-3 relative">

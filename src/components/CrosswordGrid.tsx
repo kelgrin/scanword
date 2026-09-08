@@ -20,6 +20,8 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword }) => {
   const isCellSolved = useCrosswordStore((s) => s.isCellSolved);
   const getNextCellInWord = useCrosswordStore((s) => s.getNextCellInWord);
   const getPrevCellInWord = useCrosswordStore((s) => s.getPrevCellInWord);
+  const getNextEmptyCellInWord = useCrosswordStore((s) => s.getNextEmptyCellInWord);
+  const getPrevEmptyCellInWord = useCrosswordStore((s) => s.getPrevEmptyCellInWord);
 
   const inputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
 
@@ -43,7 +45,7 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword }) => {
     }
   }, [activeCellId]);
 
-  // Handle clue cell click - focus first letter of target word (FIX for bug #3)
+  // Handle clue cell click - focus first EMPTY letter of target word
   const handleCellFocus = useCallback(
     (cellId: string) => {
       const cell = cells.find((c) => c.id === cellId);
@@ -52,10 +54,15 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword }) => {
       if (cell.type === 'clue' && cell.targetWordId) {
         const word = words.find((w) => w.id === cell.targetWordId);
         if (word && word.cells.length > 0) {
-          // FIX bug #3: First set the word, then set the cell with explicit wordId
-          // so that setActiveCell doesn't override the word selection
+          // Find first EMPTY cell in the word
+          const firstEmptyCellId = word.cells.find((cid) => {
+            const c = cells.find((cc) => cc.id === cid);
+            return c && c.type === 'empty' && c.userInput === '';
+          });
+          
+          const targetCellId = firstEmptyCellId || word.cells[0];
           setActiveWord(word.id);
-          setActiveCell(word.cells[0], word.id);
+          setActiveCell(targetCellId, word.id);
         }
       } else if (cell.type === 'empty') {
         // Find which word this cell belongs to
@@ -85,22 +92,18 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword }) => {
 
       setInput(cellId, letter);
 
-      // Auto-advance to next cell — preserve active word (FIX for bug #2)
+      // Auto-advance to next EMPTY cell — skip filled cells
       const currentActiveWordId = useCrosswordStore.getState().activeWordId;
       if (currentActiveWordId) {
-        const nextCellId = getNextCellInWord(cellId, currentActiveWordId);
-        if (nextCellId) {
-          const nextCell = cells.find((c) => c.id === nextCellId);
-          if (nextCell && nextCell.type === 'empty' && !isCellSolved(nextCellId)) {
-            setTimeout(() => {
-              // FIX bug #2: pass wordId explicitly so it doesn't get overridden
-              setActiveCell(nextCellId, currentActiveWordId);
-            }, 10);
-          }
+        const nextEmptyCellId = getNextEmptyCellInWord(cellId, currentActiveWordId);
+        if (nextEmptyCellId) {
+          setTimeout(() => {
+            setActiveCell(nextEmptyCellId, currentActiveWordId);
+          }, 10);
         }
       }
     },
-    [setInput, getNextCellInWord, cells, setActiveCell, isCellSolved]
+    [setInput, getNextEmptyCellInWord, setActiveCell]
   );
 
   // Handle keyboard events
@@ -109,19 +112,19 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword }) => {
       const currentActiveWordId = useCrosswordStore.getState().activeWordId;
 
       if (e.key === 'Backspace') {
-        e.preventDefault(); // FIX bug #1: always prevent default for Backspace
+        e.preventDefault();
         const cell = cells.find((c) => c.id === cellId);
         if (!cell) return;
 
         if (cell.userInput !== '') {
-          // Cell has content — clear it
+          // Cell has content — clear it and stay on it
           clearInput(cellId);
         } else if (currentActiveWordId) {
-          // Cell is empty — move to previous cell and clear it
-          const prevCellId = getPrevCellInWord(cellId, currentActiveWordId);
-          if (prevCellId) {
-            clearInput(prevCellId);
-            setActiveCell(prevCellId, currentActiveWordId);
+          // Cell is empty — find previous EMPTY cell and clear it
+          const prevEmptyCellId = getPrevEmptyCellInWord(cellId, currentActiveWordId);
+          if (prevEmptyCellId) {
+            clearInput(prevEmptyCellId);
+            setActiveCell(prevEmptyCellId, currentActiveWordId);
           }
         }
         return;
@@ -167,7 +170,7 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword }) => {
         }
       }
     },
-    [cells, words, setActiveCell, setActiveWord, clearInput, getPrevCellInWord]
+    [cells, words, setActiveCell, setActiveWord, clearInput, getPrevEmptyCellInWord]
   );
 
   return (
