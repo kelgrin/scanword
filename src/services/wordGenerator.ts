@@ -1,14 +1,15 @@
 import { Cell, CrosswordData, Word, Direction } from '../types/crossword';
+import { getQuestions, Question } from './supabaseApi';
 
 // ============================================================
-// Словарь русских слов с определениями
+// Словарь русских слов с определениями (fallback)
 // ============================================================
 interface WordEntry {
   word: string; // слово ВЕРХНИМ регистром
   clue: string; // определение / вопрос
 }
 
-const WORD_POOL: WordEntry[] = [
+const FALLBACK_WORD_POOL: WordEntry[] = [
   { word: 'КОШКА', clue: 'Мурлыкающее домашнее животное' },
   { word: 'СОБАКА', clue: 'Лучший друг человека' },
   { word: 'ДЕРЕВО', clue: 'Растёт в лесу, имеет ствол и крону' },
@@ -60,6 +61,39 @@ const WORD_POOL: WordEntry[] = [
   { word: 'МИР', clue: 'Вся наша планета' },
   { word: 'ТОРТ', clue: 'Сладкое лакомство на праздник' },
 ];
+
+// Функция для загрузки слов из Supabase
+async function loadWordsFromDB(): Promise<WordEntry[]> {
+  try {
+    const questions = await getQuestions(50);
+    if (questions.length > 0) {
+      console.log(`Loaded ${questions.length} words from Supabase`);
+      return questions.map((q: Question) => ({
+        word: q.word.toUpperCase(),
+        clue: q.clue,
+      }));
+    }
+  } catch (error) {
+    console.warn('Failed to load words from Supabase, using fallback:', error);
+  }
+  return FALLBACK_WORD_POOL;
+}
+
+// Глобальный кэш слов
+let wordPoolCache: WordEntry[] | null = null;
+
+// Функция для получения пула слов (с кэшированием)
+async function getWordPool(): Promise<WordEntry[]> {
+  if (!wordPoolCache) {
+    wordPoolCache = await loadWordsFromDB();
+  }
+  return wordPoolCache;
+}
+
+// Функция для сброса кэша (если нужно обновить слова)
+export function resetWordPoolCache() {
+  wordPoolCache = null;
+}
 
 // ============================================================
 // Типы для внутреннего алгоритма
@@ -276,9 +310,12 @@ function findPossiblePlacements(
 // ============================================================
 // Основной генератор
 // ============================================================
-export function generateCrossword(targetWordCount: number = 10): CrosswordData {
+export async function generateCrossword(targetWordCount: number = 10): Promise<CrosswordData> {
   const gridSize = 20; // Достаточно большая сетка для размещения
   const maxAttempts = 50;
+
+  // Загружаем слова из базы данных
+  const WORD_POOL = await getWordPool();
 
   let bestResult: {
     placedWords: PlacedWord[];
@@ -291,8 +328,8 @@ export function generateCrossword(targetWordCount: number = 10): CrosswordData {
     const pool = shuffleArray(WORD_POOL);
 
     // Первое слово — самое длинное, горизонтально, в центре сетки
-    const sorted = [...pool].sort((a, b) => b.word.length - a.word.length);
-    const firstWord = sorted[0];
+    const sorted = [...pool].sort((a: WordEntry, b: WordEntry) => b.word.length - a.word.length);
+    const firstWord = sorted[0] as WordEntry;
     const center = Math.floor(gridSize / 2);
     const startX = center - Math.floor(firstWord.word.length / 2);
     const startY = center;
@@ -315,7 +352,7 @@ export function generateCrossword(targetWordCount: number = 10): CrosswordData {
     for (const entry of shuffledRemaining) {
       if (placedWords.length >= targetWordCount) break;
 
-      const placements = findPossiblePlacements(entry, grid, placedWords, gridSize);
+      const placements = findPossiblePlacements(entry as WordEntry, grid, placedWords, gridSize);
       if (placements.length === 0) continue;
 
       // Выбираем размещение с наибольшим количеством пересечений, ближе к центру
@@ -328,11 +365,11 @@ export function generateCrossword(targetWordCount: number = 10): CrosswordData {
 
       const best = placements[0];
       const wordId = `w${placedWords.length + 1}`;
-      placeWordInGrid(entry, best.direction, best.startX, best.startY, grid, wordId);
+      placeWordInGrid(entry as WordEntry, best.direction, best.startX, best.startY, grid, wordId);
       placedWords.push({
         id: wordId,
-        word: entry.word,
-        clue: entry.clue,
+        word: (entry as WordEntry).word,
+        clue: (entry as WordEntry).clue,
         direction: best.direction,
         startX: best.startX,
         startY: best.startY,
