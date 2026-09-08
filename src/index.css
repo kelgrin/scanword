@@ -1,6 +1,13 @@
 @import "tailwindcss";
 
 @layer base {
+  html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+    margin: 0;
+    padding: 0;
+  }
+
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
@@ -11,8 +18,22 @@
 @layer components {
   .crossword-grid > * {
     aspect-ratio: 1;
-    min-width: 72px;
-    min-height: 72px;
+    width: 60px;
+    height: 60px;
+  }
+
+  @media (max-width: 1024px) {
+    .crossword-grid > * {
+      width: 52px;
+      height: 52px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .crossword-grid > * {
+      width: 44px;
+      height: 44px;
+    }
   }
 
   @keyframes fade-in {
