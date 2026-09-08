@@ -5,7 +5,18 @@ import { useCrosswordStore } from './store/crosswordStore';
 import CrosswordGrid from './components/CrosswordGrid';
 import WordList from './components/WordList';
 import DraggableGrid from './components/DraggableGrid';
-import { Shuffle, Trophy, Lightbulb, Timer, Sun, Moon } from 'lucide-react';
+import MultiplayerPage from './components/MultiplayerPage';
+import Chat from './components/Chat';
+import {
+  subscribeToGameState,
+  subscribeToPlayers,
+  getRoomLetters,
+  getRoomPlayers,
+  saveLetter,
+  deleteLetter,
+  Player,
+} from './services/multiplayerApi';
+import { Shuffle, Trophy, Lightbulb, Timer, Sun, Moon, Users } from 'lucide-react';
 
 function App() {
   const [crossword, setCrossword] = useState<CrosswordData | null>(null);
@@ -15,6 +26,18 @@ function App() {
     const saved = localStorage.getItem('theme');
     return saved === 'dark';
   });
+  
+  // Multiplayer state
+  const [showMultiplayer, setShowMultiplayer] = useState(false);
+  const [isMultiplayer, setIsMultiplayer] = useState(false);
+  const [roomId, setRoomId] = useState<string | null>(null);
+  const [playerId, setPlayerId] = useState<string | null>(null);
+  const [playerName, setPlayerName] = useState<string>(() => {
+    return localStorage.getItem('playerName') || `Игрок${Math.floor(Math.random() * 1000)}`;
+  });
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [myColor, setMyColor] = useState<string>('#3B82F6');
+  
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const solvedCount = useCrosswordStore((state) => state.getSolvedCount());
   const totalWords = useCrosswordStore((state) => state.words.length);
@@ -22,6 +45,7 @@ function App() {
   const hints = useCrosswordStore((state) => state.hints);
   const activeCellId = useCrosswordStore((state) => state.activeCellId);
   const useHint = useCrosswordStore((state) => state.useHint);
+  const cells = useCrosswordStore((state) => state.cells);
 
   useEffect(() => {
     loadCrossword();
@@ -55,6 +79,50 @@ function App() {
       }
     };
   }, [loading, crossword]);
+
+  // Multiplayer subscriptions
+  useEffect(() => {
+    if (!isMultiplayer || !roomId || !playerId) return;
+
+    // Загружаем начальное состояние
+    getRoomLetters(roomId).then((letters) => {
+      letters.forEach((letter) => {
+        useCrosswordStore.getState().setInput(letter.cell_id, letter.letter);
+      });
+    });
+
+    getRoomPlayers(roomId).then((playersList) => {
+      setPlayers(playersList);
+      const me = playersList.find((p) => p.player_id === playerId);
+      if (me) setMyColor(me.color);
+    });
+
+    // Подписываемся на изменения состояния
+    const gameStateSub = subscribeToGameState(roomId, (payload) => {
+      if (payload.new.player_id === playerId) return; // Игнорируем свои изменения
+      
+      if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+        useCrosswordStore.getState().setInput(payload.new.cell_id, payload.new.letter);
+      } else if (payload.eventType === 'DELETE') {
+        useCrosswordStore.getState().clearInput(payload.old?.cell_id || '');
+      }
+    });
+
+    // Подписываемся на изменения игроков
+    const playersSub = subscribeToPlayers(roomId, () => {
+      getRoomPlayers(roomId).then(setPlayers);
+    });
+
+    return () => {
+      gameStateSub.unsubscribe();
+      playersSub.unsubscribe();
+    };
+  }, [isMultiplayer, roomId, playerId]);
+
+  // Сохраняем имя игрока
+  useEffect(() => {
+    localStorage.setItem('playerName', playerName);
+  }, [playerName]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -99,7 +167,44 @@ function App() {
     }
   };
 
+  // Multiplayer handlers
+  const handleRoomCreated = (newRoomId: string, newPlayerId: string, code: string, crosswordData: CrosswordData) => {
+    setRoomId(newRoomId);
+    setPlayerId(newPlayerId);
+    setIsMultiplayer(true);
+    setShowMultiplayer(false);
+    setCrossword(crosswordData);
+    setLoading(false);
+  };
+
+  const handleRoomJoined = (newRoomId: string, newPlayerId: string, crosswordData: CrosswordData) => {
+    setRoomId(newRoomId);
+    setPlayerId(newPlayerId);
+    setIsMultiplayer(true);
+    setShowMultiplayer(false);
+    setCrossword(crosswordData);
+    setLoading(false);
+  };
+
+  const handleLeaveMultiplayer = () => {
+    setIsMultiplayer(false);
+    setRoomId(null);
+    setPlayerId(null);
+    setPlayers([]);
+  };
+
   const isCompleted = totalWords > 0 && solvedCount === totalWords;
+
+  // Show multiplayer page
+  if (showMultiplayer) {
+    return (
+      <MultiplayerPage
+        onBack={() => setShowMultiplayer(false)}
+        onRoomCreated={handleRoomCreated}
+        onRoomJoined={handleRoomJoined}
+      />
+    );
+  }
 
   if (loading) {
     return (
@@ -177,10 +282,32 @@ function App() {
               <span className="hidden sm:inline text-sm">{hints}</span>
             </button>
 
+            {/* Multiplayer button */}
+            {!isMultiplayer && (
+              <button
+                onClick={() => setShowMultiplayer(true)}
+                className="flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg hover:from-purple-600 hover:to-pink-700 transition-all shadow-md hover:shadow-lg active:scale-95"
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline text-sm">Мультиплеер</span>
+              </button>
+            )}
+
+            {/* Leave multiplayer button */}
+            {isMultiplayer && (
+              <button
+                onClick={handleLeaveMultiplayer}
+                className="flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-red-500 to-orange-600 text-white rounded-lg hover:from-red-600 hover:to-orange-700 transition-all shadow-md hover:shadow-lg active:scale-95"
+              >
+                <span className="hidden sm:inline text-sm">Выйти</span>
+              </button>
+            )}
+
             {/* New crossword button */}
             <button
               onClick={generateNew}
-              className="flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-amber-400 to-orange-500 text-white rounded-lg hover:from-amber-500 hover:to-orange-600 transition-all shadow-md hover:shadow-lg active:scale-95"
+              disabled={isMultiplayer}
+              className="flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-amber-400 to-orange-500 text-white rounded-lg hover:from-amber-500 hover:to-orange-600 transition-all shadow-md hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Shuffle className="w-3.5 h-3.5" />
               <span className="hidden sm:inline text-sm">Новый</span>
@@ -249,7 +376,29 @@ function App() {
             <WordList words={crossword?.words || []} />
           </aside>
         </div>
+
+        {/* Multiplayer players indicator */}
+        {isMultiplayer && players.length > 0 && (
+          <div className="mt-4 flex items-center justify-center gap-2">
+            <span className="text-sm text-gray-600 dark:text-gray-400">Игроки:</span>
+            {players.map((player) => (
+              <div
+                key={player.player_id}
+                className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium text-white"
+                style={{ backgroundColor: player.color }}
+              >
+                {player.player_name}
+                {player.player_id === playerId && ' (вы)'}
+              </div>
+            ))}
+          </div>
+        )}
       </main>
+
+      {/* Chat component for multiplayer */}
+      {isMultiplayer && roomId && playerId && (
+        <Chat roomId={roomId} playerId={playerId} playerName={playerName} />
+      )}
     </div>
   );
 }
