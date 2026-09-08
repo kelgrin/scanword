@@ -39,7 +39,19 @@ function App() {
 
   const handleUseHint = () => {
     if (hints > 0 && activeCellId) {
-      useHint(activeCellId);
+      const success = useHint(activeCellId);
+      if (success) {
+        // Move to next empty cell in the active word
+        const currentActiveWordId = useCrosswordStore.getState().activeWordId;
+        if (currentActiveWordId) {
+          const nextEmptyCellId = useCrosswordStore.getState().getNextEmptyCellInWord(activeCellId, currentActiveWordId);
+          if (nextEmptyCellId) {
+            setTimeout(() => {
+              useCrosswordStore.getState().setActiveCell(nextEmptyCellId, currentActiveWordId);
+            }, 10);
+          }
+        }
+      }
     }
   };
 

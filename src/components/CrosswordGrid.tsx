@@ -39,14 +39,28 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword }) => {
       // Use requestAnimationFrame to ensure DOM is updated
       requestAnimationFrame(() => {
         const input = inputRefs.current.get(activeCellId);
-        if (input && !input.readOnly) {
-          input.focus();
-          input.select();
-          input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        if (input) {
+          if (!input.readOnly) {
+            input.focus();
+            input.select();
+            input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          } else {
+            // If cell is readOnly (solved), try to find next non-solved cell in active word
+            const currentActiveWordId = useCrosswordStore.getState().activeWordId;
+            if (currentActiveWordId) {
+              const word = words.find((w) => w.id === currentActiveWordId);
+              if (word) {
+                const nextNonSolved = word.cells.find((cid) => !isCellSolved(cid));
+                if (nextNonSolved && nextNonSolved !== activeCellId) {
+                  setActiveCell(nextNonSolved, currentActiveWordId);
+                }
+              }
+            }
+          }
         }
       });
     }
-  }, [activeCellId]);
+  }, [activeCellId, words, isCellSolved, setActiveCell]);
 
   // Handle clue cell click - focus first EMPTY letter of target word
   const handleCellFocus = useCallback(
@@ -57,13 +71,14 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword }) => {
       if (cell.type === 'clue' && cell.targetWordId) {
         const word = words.find((w) => w.id === cell.targetWordId);
         if (word && word.cells.length > 0) {
-          // Find first EMPTY cell in the word
+          // Find first EMPTY and NOT SOLVED cell in the word
           const firstEmptyCellId = word.cells.find((cid) => {
             const c = cells.find((cc) => cc.id === cid);
-            return c && c.type === 'empty' && c.userInput === '';
+            return c && c.type === 'empty' && c.userInput === '' && !useCrosswordStore.getState().isCellSolved(cid);
           });
           
-          const targetCellId = firstEmptyCellId || word.cells[0];
+          // If all cells are filled, find first non-solved cell
+          const targetCellId = firstEmptyCellId || word.cells.find((cid) => !useCrosswordStore.getState().isCellSolved(cid)) || word.cells[0];
           setActiveWord(word.id);
           setActiveCell(targetCellId, word.id);
         }
@@ -128,14 +143,15 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword }) => {
           // Cell has content — clear it and stay on it
           clearInput(cellId);
         } else if (currentActiveWordId) {
-          // Cell is empty — find previous cell in word (regardless of whether it's filled)
-          const prevCellId = getPrevCellInWord(cellId, currentActiveWordId);
+          // Cell is empty — find previous non-solved cell in word
+          let prevCellId = getPrevCellInWord(cellId, currentActiveWordId);
+          
+          // Skip over solved cells
+          while (prevCellId && isCellSolved(prevCellId)) {
+            prevCellId = getPrevCellInWord(prevCellId, currentActiveWordId);
+          }
+          
           if (prevCellId) {
-            // Don't allow deletion from solved cells
-            if (isCellSolved(prevCellId)) {
-              return;
-            }
-            
             const prevCell = cells.find((c) => c.id === prevCellId);
             if (prevCell && prevCell.userInput !== '') {
               // Previous cell has content — clear it and move to it
