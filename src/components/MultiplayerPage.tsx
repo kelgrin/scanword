@@ -17,6 +17,9 @@ const MultiplayerPage: React.FC<MultiplayerPageProps> = ({ onBack, onRoomCreated
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [createdRoomCode, setCreatedRoomCode] = useState('');
+  const [createdRoomId, setCreatedRoomId] = useState('');
+  const [createdPlayerId, setCreatedPlayerId] = useState('');
+  const [createdCrosswordData, setCreatedCrosswordData] = useState<CrosswordData | null>(null);
   const [copied, setCopied] = useState(false);
 
   const handleCreateRoom = async () => {
@@ -35,14 +38,12 @@ const MultiplayerPage: React.FC<MultiplayerPageProps> = ({ onBack, onRoomCreated
       
       const { roomId, playerId, code } = await createRoom(crosswordData, playerName.trim());
       setCreatedRoomCode(code);
+      setCreatedRoomId(roomId);
+      setCreatedPlayerId(playerId);
+      setCreatedCrosswordData(crosswordData);
       
       // Загружаем кроссворд в store
       useCrosswordStore.getState().loadCrossword(crosswordData);
-      
-      // Переходим в режим ожидания
-      setTimeout(() => {
-        onRoomCreated(roomId, playerId, code, crosswordData);
-      }, 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка создания комнаты');
     } finally {
@@ -168,9 +169,20 @@ const MultiplayerPage: React.FC<MultiplayerPageProps> = ({ onBack, onRoomCreated
                 )}
               </button>
 
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Ожидание второго игрока...
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                Отправьте код другу и дождитесь его присоединения
               </p>
+
+              <button
+                onClick={() => {
+                  if (createdRoomId && createdPlayerId && createdRoomCode && createdCrosswordData) {
+                    onRoomCreated(createdRoomId, createdPlayerId, createdRoomCode, createdCrosswordData);
+                  }
+                }}
+                className="w-full bg-gradient-to-r from-green-500 to-teal-600 text-white py-3 rounded-xl font-semibold hover:shadow-lg transition-all"
+              >
+                Продолжить
+              </button>
             </div>
           </div>
         </div>
