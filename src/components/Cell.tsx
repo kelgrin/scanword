@@ -39,7 +39,8 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
         if (targetWord?.isSolved) {
           setShowTooltip(!showTooltip);
         } else {
-          // Focus first cell of target word
+          // Focus first EMPTY cell of target word
+          // Pass the clue cell ID, CrosswordGrid will find the correct target
           onFocus(cell.id);
         }
       }

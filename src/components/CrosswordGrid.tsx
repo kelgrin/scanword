@@ -36,12 +36,15 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword }) => {
   // Focus active cell
   useEffect(() => {
     if (activeCellId) {
-      const input = inputRefs.current.get(activeCellId);
-      if (input) {
-        input.focus();
-        input.select();
-        input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
+      // Use requestAnimationFrame to ensure DOM is updated
+      requestAnimationFrame(() => {
+        const input = inputRefs.current.get(activeCellId);
+        if (input && !input.readOnly) {
+          input.focus();
+          input.select();
+          input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      });
     }
   }, [activeCellId]);
 
@@ -116,15 +119,32 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword }) => {
         const cell = cells.find((c) => c.id === cellId);
         if (!cell) return;
 
+        // Don't allow deletion from solved cells
+        if (isCellSolved(cellId)) {
+          return;
+        }
+
         if (cell.userInput !== '') {
           // Cell has content — clear it and stay on it
           clearInput(cellId);
         } else if (currentActiveWordId) {
-          // Cell is empty — find previous EMPTY cell and clear it
-          const prevEmptyCellId = getPrevEmptyCellInWord(cellId, currentActiveWordId);
-          if (prevEmptyCellId) {
-            clearInput(prevEmptyCellId);
-            setActiveCell(prevEmptyCellId, currentActiveWordId);
+          // Cell is empty — find previous cell in word (regardless of whether it's filled)
+          const prevCellId = getPrevCellInWord(cellId, currentActiveWordId);
+          if (prevCellId) {
+            // Don't allow deletion from solved cells
+            if (isCellSolved(prevCellId)) {
+              return;
+            }
+            
+            const prevCell = cells.find((c) => c.id === prevCellId);
+            if (prevCell && prevCell.userInput !== '') {
+              // Previous cell has content — clear it and move to it
+              clearInput(prevCellId);
+              setActiveCell(prevCellId, currentActiveWordId);
+            } else {
+              // Previous cell is also empty — just move to it
+              setActiveCell(prevCellId, currentActiveWordId);
+            }
           }
         }
         return;
