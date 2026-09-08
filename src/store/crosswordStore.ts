@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { Cell, CrosswordData, Word } from '../types/crossword';
-import { crosswordApi } from '../services/crosswordApi';
 
 interface CrosswordState {
   crossword: CrosswordData | null;
@@ -8,11 +7,10 @@ interface CrosswordState {
   words: Word[];
   activeCellId: string | null;
   activeWordId: string | null;
-  loading: boolean;
-  error: string | null;
 
   // Actions
-  loadCrossword: (id: string) => Promise<void>;
+  loadCrossword: (data: CrosswordData) => void;
+  reset: () => void;
   setActiveCell: (cellId: string | null) => void;
   setActiveWord: (wordId: string | null) => void;
   setInput: (cellId: string, value: string) => void;
@@ -24,6 +22,9 @@ interface CrosswordState {
   isCellSolved: (cellId: string) => boolean;
   getClueForCell: (cellId: string) => { clueText: string; wordId: string } | null;
   getProgress: () => { solved: number; total: number };
+  getSolvedCount: () => number;
+  getNextCellInWord: (cellId: string, wordId: string) => string | null;
+  getPrevCellInWord: (cellId: string, wordId: string) => string | null;
 }
 
 export const useCrosswordStore = create<CrosswordState>((set, get) => ({
@@ -32,22 +33,25 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
   words: [],
   activeCellId: null,
   activeWordId: null,
-  loading: false,
-  error: null,
 
-  loadCrossword: async (id: string) => {
-    set({ loading: true, error: null });
-    try {
-      const data = await crosswordApi.fetchCrossword(id);
-      set({
-        crossword: data,
-        cells: data.cells,
-        words: data.words,
-        loading: false,
-      });
-    } catch {
-      set({ error: 'Ошибка загрузки сканворда', loading: false });
-    }
+  loadCrossword: (data: CrosswordData) => {
+    set({
+      crossword: data,
+      cells: data.cells,
+      words: data.words,
+      activeCellId: null,
+      activeWordId: null,
+    });
+  },
+
+  reset: () => {
+    set({
+      crossword: null,
+      cells: [],
+      words: [],
+      activeCellId: null,
+      activeWordId: null,
+    });
   },
 
   setActiveCell: (cellId: string | null) => {
@@ -62,7 +66,7 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
 
     // Find which word this cell belongs to
     const word = state.words.find((w) => w.cells.includes(cellId));
-    
+
     set({
       activeCellId: cellId,
       activeWordId: word ? word.id : state.activeWordId,
@@ -94,14 +98,16 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
   checkWords: () => {
     const state = get();
     const updatedWords = state.words.map((word) => {
+      if (word.isSolved) return word; // already solved
+
       const wordCells = word.cells.map((cid) => state.cells.find((c) => c.id === cid));
       const allFilled = wordCells.every((c) => c && c.userInput !== '');
       const allCorrect = wordCells.every((c) => c && c.userInput === c.answerLetter);
-      
-      return {
-        ...word,
-        isSolved: allFilled && allCorrect,
-      };
+
+      if (allFilled && allCorrect) {
+        return { ...word, isSolved: true };
+      }
+      return word;
     });
 
     set({ words: updatedWords });
@@ -129,8 +135,7 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
 
   isCellSolved: (cellId: string) => {
     const state = get();
-    const word = state.words.find((w) => w.cells.includes(cellId));
-    return word ? word.isSolved : false;
+    return state.words.some((w) => w.isSolved && w.cells.includes(cellId));
   },
 
   getClueForCell: (cellId: string) => {
@@ -145,5 +150,28 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
     const total = state.words.length;
     const solved = state.words.filter((w) => w.isSolved).length;
     return { solved, total };
+  },
+
+  getSolvedCount: () => {
+    const state = get();
+    return state.words.filter((w) => w.isSolved).length;
+  },
+
+  getNextCellInWord: (cellId: string, wordId: string) => {
+    const state = get();
+    const word = state.words.find((w) => w.id === wordId);
+    if (!word) return null;
+    const idx = word.cells.indexOf(cellId);
+    if (idx === -1 || idx >= word.cells.length - 1) return null;
+    return word.cells[idx + 1];
+  },
+
+  getPrevCellInWord: (cellId: string, wordId: string) => {
+    const state = get();
+    const word = state.words.find((w) => w.id === wordId);
+    if (!word) return null;
+    const idx = word.cells.indexOf(cellId);
+    if (idx <= 0) return null;
+    return word.cells[idx - 1];
   },
 }));

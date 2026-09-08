@@ -1,171 +1,176 @@
-import React, { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { CrosswordData } from './types/crossword';
+import { crosswordApi } from './services/crosswordApi';
 import { useCrosswordStore } from './store/crosswordStore';
 import CrosswordGrid from './components/CrosswordGrid';
-import { Loader2, Trophy, RotateCcw } from 'lucide-react';
+import WordList from './components/WordList';
+import { Shuffle, Trophy, RotateCcw } from 'lucide-react';
 
-const App: React.FC = () => {
-  const loadCrossword = useCrosswordStore((s) => s.loadCrossword);
-  const loading = useCrosswordStore((s) => s.loading);
-  const error = useCrosswordStore((s) => s.error);
-  const crossword = useCrosswordStore((s) => s.crossword);
-  const getProgress = useCrosswordStore((s) => s.getProgress);
-  const words = useCrosswordStore((s) => s.words);
+function App() {
+  const [crossword, setCrossword] = useState<CrosswordData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const solvedCount = useCrosswordStore((state) => state.getSolvedCount());
+  const totalWords = useCrosswordStore((state) => state.words.length);
+  const resetStore = useCrosswordStore((state) => state.reset);
 
   useEffect(() => {
-    loadCrossword('crossword-1');
-  }, [loadCrossword]);
+    loadCrossword();
+  }, []);
 
-  const progress = getProgress();
-  const isComplete = progress.solved === progress.total && progress.total > 0;
+  const loadCrossword = async () => {
+    setLoading(true);
+    const data = await crosswordApi.fetchCrossword('crossword-1');
+    setCrossword(data);
+    useCrosswordStore.getState().loadCrossword(data);
+    setLoading(false);
+  };
+
+  const generateNew = async () => {
+    setLoading(true);
+    resetStore();
+    const data = await crosswordApi.generateNew();
+    setCrossword(data);
+    useCrosswordStore.getState().loadCrossword(data);
+    setLoading(false);
+  };
+
+  const isCompleted = totalWords > 0 && solvedCount === totalWords;
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-stone-100 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
-          <p className="text-gray-600 text-lg">Загрузка сканворда...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-stone-100 flex items-center justify-center">
-        <div className="bg-white rounded-xl shadow-lg p-8 text-center">
-          <p className="text-red-500 text-lg">{error}</p>
-          <button
-            onClick={() => loadCrossword('crossword-1')}
-            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-          >
-            Попробовать снова
-          </button>
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block w-12 h-12 border-4 border-amber-300 border-t-amber-600 rounded-full animate-spin mb-4"></div>
+          <p className="text-gray-600 text-lg">Генерируем сканворд...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-stone-100">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-50">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+      <header className="bg-white/80 backdrop-blur-sm shadow-sm sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shadow-sm">
+            <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-lg flex items-center justify-center shadow-md">
               <span className="text-white font-bold text-lg">С</span>
             </div>
             <div>
-              <h1 className="text-lg font-bold text-gray-800 leading-tight">Сканворд</h1>
-              <p className="text-xs text-gray-500">{crossword?.title}</p>
+              <h1 className="text-xl font-bold text-gray-800">Сканворд</h1>
+              <p className="text-xs text-gray-500">Решай кроссворды онлайн</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             {/* Progress */}
-            <div className="flex items-center gap-2 bg-stone-50 rounded-lg px-3 py-2 border border-stone-200">
-              {isComplete ? (
-                <div className="flex items-center gap-2">
-                  <Trophy className="w-5 h-5 text-yellow-500 animate-pop-in" />
-                  <span className="text-sm font-semibold text-green-600 hidden sm:inline">
-                    Победа! 🎉
-                  </span>
+            <div className="hidden sm:flex items-center gap-3">
+              <div className="text-right">
+                <p className="text-sm font-medium text-gray-700">
+                  {isCompleted ? (
+                    <span className="flex items-center gap-1 text-green-600">
+                      <Trophy className="w-4 h-4" /> Все угадано!
+                    </span>
+                  ) : (
+                    `Угадано: ${solvedCount} / ${totalWords}`
+                  )}
+                </p>
+                <div className="w-32 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-amber-400 to-green-500 rounded-full transition-all duration-500"
+                    style={{ width: `${totalWords > 0 ? (solvedCount / totalWords) * 100 : 0}%` }}
+                  />
                 </div>
-              ) : (
-                <>
-                  <div className="text-sm text-gray-600 whitespace-nowrap">
-                    <span className="font-bold text-blue-600">{progress.solved}</span>
-                    <span className="text-gray-400">/</span>
-                    <span>{progress.total}</span>
-                  </div>
-                  <div className="w-16 sm:w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full transition-all duration-500 ease-out"
-                      style={{ width: `${(progress.solved / progress.total) * 100}%` }}
-                    />
-                  </div>
-                </>
-              )}
+              </div>
             </div>
+
+            {/* New crossword button */}
+            <button
+              onClick={generateNew}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-400 to-orange-500 text-white rounded-lg hover:from-amber-500 hover:to-orange-600 transition-all shadow-md hover:shadow-lg active:scale-95"
+            >
+              <Shuffle className="w-4 h-4" />
+              <span className="hidden sm:inline">Новый</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile progress */}
+        <div className="sm:hidden px-4 pb-2">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs text-gray-600">Прогресс</span>
+            <span className="text-xs font-medium text-gray-700">
+              {solvedCount} / {totalWords}
+            </span>
+          </div>
+          <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-amber-400 to-green-500 rounded-full transition-all duration-500"
+              style={{ width: `${totalWords > 0 ? (solvedCount / totalWords) * 100 : 0}%` }}
+            />
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 py-6">
-        <div className="flex flex-col items-center gap-5">
-          {/* Completion Banner */}
-          {isComplete && (
-            <div className="w-full max-w-lg bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl px-6 py-4 text-center animate-pop-in">
-              <Trophy className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
-              <h2 className="text-lg font-bold text-green-700">Поздравляем!</h2>
-              <p className="text-sm text-green-600 mt-1">Вы разгадали все слова в сканворде!</p>
-              <button
-                onClick={() => loadCrossword('crossword-1')}
-                className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
-              >
-                <RotateCcw className="w-4 h-4" />
-                Начать заново
-              </button>
-            </div>
-          )}
+      {/* Completion banner */}
+      {isCompleted && (
+        <div className="bg-gradient-to-r from-green-400 to-emerald-500 text-white py-3 px-4 text-center shadow-lg">
+          <div className="flex items-center justify-center gap-2">
+            <Trophy className="w-6 h-6" />
+            <span className="font-bold text-lg">Поздравляем! Все слова разгаданы!</span>
+            <Trophy className="w-6 h-6" />
+          </div>
+          <button
+            onClick={generateNew}
+            className="mt-2 px-4 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 mx-auto"
+          >
+            <RotateCcw className="w-4 h-4" />
+            Новый сканворд
+          </button>
+        </div>
+      )}
 
-          {/* Instructions */}
-          {!isComplete && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-5 py-3 max-w-lg text-center">
-              <p className="text-xs sm:text-sm text-gray-500">
-                <span className="font-semibold text-gray-700">Подсказка:</span>{' '}
-                Нажмите на клетку с вопросом для начала ввода.{' '}
-                <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px] border border-gray-200 font-mono">Tab</kbd> — следующее слово,{' '}
-                <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px] border border-gray-200 font-mono">←→↑↓</kbd> — навигация
-              </p>
+      {/* Main content */}
+      <main className="max-w-6xl mx-auto px-4 py-6">
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Grid */}
+          <div className="flex-1 flex justify-center">
+            <div className="overflow-x-auto pb-4">
+              {crossword && <CrosswordGrid crossword={crossword} />}
             </div>
-          )}
-
-          {/* Crossword Grid */}
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-4 sm:p-6 overflow-x-auto max-w-full">
-            <CrosswordGrid />
           </div>
 
-          {/* Word list */}
-          <div className="w-full max-w-lg">
-            <h2 className="text-base font-semibold text-gray-700 mb-3 flex items-center gap-2">
-              <span className="w-2 h-2 bg-blue-500 rounded-full" />
-              Список слов
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {words.map((word, idx) => (
-                <div
-                  key={word.id}
-                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border transition-all duration-300
-                    ${word.isSolved
-                      ? 'bg-green-50 border-green-200 shadow-sm'
-                      : 'bg-white border-gray-100 hover:border-blue-200 hover:shadow-sm'
-                    }
-                  `}
-                >
-                  <span className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full shrink-0
-                    ${word.isSolved ? 'bg-green-200 text-green-700' : 'bg-gray-100 text-gray-500'}
-                  `}>
-                    {word.isSolved ? '✓' : idx + 1}
-                  </span>
-                  <span className={`text-sm leading-tight
-                    ${word.isSolved ? 'text-green-700 line-through decoration-green-300' : 'text-gray-600'}
-                  `}>
-                    {word.clueText}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* Word list sidebar */}
+          <aside className="lg:w-72 shrink-0">
+            <WordList words={crossword?.words || []} />
+          </aside>
+        </div>
+
+        {/* Instructions */}
+        <div className="mt-6 bg-white/60 rounded-xl p-4 text-sm text-gray-600">
+          <h3 className="font-medium text-gray-800 mb-2">Как играть:</h3>
+          <ul className="grid sm:grid-cols-2 gap-2">
+            <li className="flex items-start gap-2">
+              <span className="text-amber-500">•</span>
+              Нажмите на клетку с вопросом — фокус перейдёт на первую букву
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-amber-500">•</span>
+              Вводите буквы — фокус автоматически перемещается
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-amber-500">•</span>
+              Backspace — удаляет букву или переходит назад
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-amber-500">•</span>
+              Tab — переключение между словами
+            </li>
+          </ul>
         </div>
       </main>
-
-      {/* Footer */}
-      <footer className="text-center py-6 text-xs text-gray-400">
-        Сканворд — решай кроссворды онлайн • React + TypeScript + Zustand
-      </footer>
     </div>
   );
-};
+}
 
 export default App;

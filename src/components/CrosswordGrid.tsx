@@ -1,18 +1,25 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import Cell from './Cell';
 import { useCrosswordStore } from '../store/crosswordStore';
+import { CrosswordData } from '../types/crossword';
 
-const CrosswordGrid: React.FC = () => {
+interface CrosswordGridProps {
+  crossword: CrosswordData;
+}
+
+const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword }) => {
   const cells = useCrosswordStore((s) => s.cells);
   const words = useCrosswordStore((s) => s.words);
-  const crossword = useCrosswordStore((s) => s.crossword);
   const activeCellId = useCrosswordStore((s) => s.activeCellId);
   const activeWordId = useCrosswordStore((s) => s.activeWordId);
   const setActiveCell = useCrosswordStore((s) => s.setActiveCell);
+  const setActiveWord = useCrosswordStore((s) => s.setActiveWord);
   const setInput = useCrosswordStore((s) => s.setInput);
   const clearInput = useCrosswordStore((s) => s.clearInput);
   const isCellInActiveWord = useCrosswordStore((s) => s.isCellInActiveWord);
   const isCellSolved = useCrosswordStore((s) => s.isCellSolved);
+  const getNextCellInWord = useCrosswordStore((s) => s.getNextCellInWord);
+  const getPrevCellInWord = useCrosswordStore((s) => s.getPrevCellInWord);
 
   const inputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
 
@@ -31,38 +38,10 @@ const CrosswordGrid: React.FC = () => {
       if (input) {
         input.focus();
         input.select();
-        // Scroll into view for mobile
         input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
     }
   }, [activeCellId]);
-
-  // Get next cell in word direction
-  const getNextCellInWord = useCallback(
-    (currentCellId: string, wordId: string): string | null => {
-      const word = words.find((w) => w.id === wordId);
-      if (!word) return null;
-      const idx = word.cells.indexOf(currentCellId);
-      if (idx < word.cells.length - 1) {
-        return word.cells[idx + 1];
-      }
-      return null;
-    },
-    [words]
-  );
-
-  const getPrevCellInWord = useCallback(
-    (currentCellId: string, wordId: string): string | null => {
-      const word = words.find((w) => w.id === wordId);
-      if (!word) return null;
-      const idx = word.cells.indexOf(currentCellId);
-      if (idx > 0) {
-        return word.cells[idx - 1];
-      }
-      return null;
-    },
-    [words]
-  );
 
   // Handle clue cell click - focus first letter of target word
   const handleCellFocus = useCallback(
@@ -74,18 +53,18 @@ const CrosswordGrid: React.FC = () => {
         const word = words.find((w) => w.id === cell.targetWordId);
         if (word && word.cells.length > 0) {
           setActiveCell(word.cells[0]);
-          useCrosswordStore.getState().setActiveWord(word.id);
+          setActiveWord(word.id);
         }
       } else if (cell.type === 'empty') {
         // Find which word this cell belongs to
         const word = words.find((w) => w.cells.includes(cellId));
         setActiveCell(cellId);
         if (word) {
-          useCrosswordStore.getState().setActiveWord(word.id);
+          setActiveWord(word.id);
         }
       }
     },
-    [cells, words, setActiveCell]
+    [cells, words, setActiveCell, setActiveWord]
   );
 
   // Handle input
@@ -129,8 +108,6 @@ const CrosswordGrid: React.FC = () => {
             clearInput(prevCellId);
             setActiveCell(prevCellId);
           }
-        } else if (cell && cell.userInput !== '') {
-          // Current cell will be cleared by default behavior
         }
         return;
       }
@@ -155,11 +132,10 @@ const CrosswordGrid: React.FC = () => {
           (c) => c.x === targetX && c.y === targetY && c.type === 'empty'
         );
         if (targetCell) {
-          // Find word for the new cell
           const word = words.find((w) => w.cells.includes(targetCell.id));
           setActiveCell(targetCell.id);
           if (word) {
-            useCrosswordStore.getState().setActiveWord(word.id);
+            setActiveWord(word.id);
           }
         }
         return;
@@ -167,7 +143,6 @@ const CrosswordGrid: React.FC = () => {
 
       if (e.key === 'Tab') {
         e.preventDefault();
-        // Move to next word
         const currentIdx = words.findIndex((w) => w.id === currentActiveWordId);
         const nextIdx = e.shiftKey
           ? (currentIdx - 1 + words.length) % words.length
@@ -175,14 +150,12 @@ const CrosswordGrid: React.FC = () => {
         const nextWord = words[nextIdx];
         if (nextWord && nextWord.cells.length > 0) {
           setActiveCell(nextWord.cells[0]);
-          useCrosswordStore.getState().setActiveWord(nextWord.id);
+          setActiveWord(nextWord.id);
         }
       }
     },
-    [cells, words, setActiveCell, clearInput, getPrevCellInWord]
+    [cells, words, setActiveCell, setActiveWord, clearInput, getPrevCellInWord]
   );
-
-  if (!crossword) return null;
 
   return (
     <div
