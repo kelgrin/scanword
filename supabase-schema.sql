@@ -4,6 +4,7 @@ CREATE TABLE game_rooms (
   room_code VARCHAR(6) UNIQUE NOT NULL,
   crossword_data JSONB NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  last_activity TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   is_active BOOLEAN DEFAULT true,
   player_count INTEGER DEFAULT 1
 );
@@ -24,6 +25,7 @@ CREATE TABLE game_state (
   player_id UUID NOT NULL,
   cell_id TEXT NOT NULL,
   letter TEXT NOT NULL,
+  player_color TEXT,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   PRIMARY KEY (room_id, player_id, cell_id)
 );

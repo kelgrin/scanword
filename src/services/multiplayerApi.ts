@@ -22,6 +22,7 @@ export interface GameState {
   player_id: string;
   cell_id: string;
   letter: string;
+  player_color?: string;
   updated_at: string;
 }
 
@@ -130,13 +131,15 @@ export async function saveLetter(
   roomId: string,
   playerId: string,
   cellId: string,
-  letter: string
+  letter: string,
+  playerColor?: string
 ) {
   const { error } = await supabase.from('game_state').upsert([{
     room_id: roomId,
     player_id: playerId,
     cell_id: cellId,
     letter,
+    player_color: playerColor,
     updated_at: new Date().toISOString(),
   }]);
 
@@ -294,6 +297,57 @@ export function subscribeToChat(
       }
     )
     .subscribe();
+}
+
+// Покинуть комнату
+export async function leaveRoom(roomId: string, playerId: string) {
+  // Удаляем игрока
+  const { error: playerError } = await supabase
+    .from('players')
+    .delete()
+    .eq('room_id', roomId)
+    .eq('player_id', playerId);
+
+  if (playerError) {
+    console.error('Failed to leave room:', playerError);
+    return;
+  }
+
+  // Получаем оставшееся количество игроков
+  const { data: remainingPlayers } = await supabase
+    .from('players')
+    .select('player_id')
+    .eq('room_id', roomId);
+
+  const remainingCount = remainingPlayers?.length || 0;
+
+  if (remainingCount === 0) {
+    // Если игроков не осталось, удаляем комнату
+    await cleanupRoom(roomId);
+  } else {
+    // Обновляем количество игроков
+    await supabase
+      .from('game_rooms')
+      .update({ player_count: remainingCount })
+      .eq('id', roomId);
+  }
+}
+
+// Очистить комнату
+export async function cleanupRoom(roomId: string) {
+  // Удаляем все связанные данные
+  await supabase.from('game_state').delete().eq('room_id', roomId);
+  await supabase.from('chat_messages').delete().eq('room_id', roomId);
+  await supabase.from('players').delete().eq('room_id', roomId);
+  await supabase.from('game_rooms').delete().eq('id', roomId);
+}
+
+// Обновить last_activity
+export async function updateRoomActivity(roomId: string) {
+  await supabase
+    .from('game_rooms')
+    .update({ last_activity: new Date().toISOString() })
+    .eq('id', roomId);
 }
 
 // Закрыть комнату

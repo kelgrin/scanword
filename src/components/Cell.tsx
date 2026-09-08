@@ -191,9 +191,12 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
           readOnly={isSolved}
           tabIndex={isSolved ? -1 : 0}
           maxLength={2}
-          className={`w-full h-full text-center text-base font-bold bg-transparent outline-none uppercase
-            ${isSolved ? 'text-green-700 dark:text-green-400 cursor-pointer' : 'text-gray-800 dark:text-gray-100 cursor-pointer'}
+          className={`w-full h-full text-center text-base font-bold bg-transparent outline-none uppercase cursor-pointer
+            ${isSolved ? 'text-green-700 dark:text-green-400' : ''}
           `}
+          style={{
+            color: isSolved ? undefined : (cell.playerColor || undefined)
+          }}
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="characters"

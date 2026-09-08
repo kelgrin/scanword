@@ -11,6 +11,7 @@ export interface Cell {
   targetWordId?: string;
   answerLetter?: string;
   userInput: string;
+  playerColor?: string;
 }
 
 export interface Word {

@@ -5,9 +5,10 @@ import { CrosswordData } from '../types/crossword';
 
 interface CrosswordGridProps {
   crossword: CrosswordData;
+  playerColor?: string;
 }
 
-const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword }) => {
+const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword, playerColor }) => {
   const cells = useCrosswordStore((s) => s.cells);
   const words = useCrosswordStore((s) => s.words);
   const activeCellId = useCrosswordStore((s) => s.activeCellId);
@@ -108,7 +109,7 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword }) => {
       const letter = value.toUpperCase().slice(-1);
       if (!/[А-ЯЁA-Z]/.test(letter)) return;
 
-      setInput(cellId, letter);
+      setInput(cellId, letter, playerColor);
 
       // Auto-advance to next EMPTY cell — skip filled cells
       const currentActiveWordId = useCrosswordStore.getState().activeWordId;
@@ -121,7 +122,7 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword }) => {
         }
       }
     },
-    [setInput, getNextEmptyCellInWord, setActiveCell]
+    [setInput, getNextEmptyCellInWord, setActiveCell, playerColor]
   );
 
   // Handle keyboard events

@@ -102,7 +102,11 @@ function App() {
       if (payload.new.player_id === playerId) return; // Игнорируем свои изменения
       
       if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-        useCrosswordStore.getState().setInput(payload.new.cell_id, payload.new.letter);
+        useCrosswordStore.getState().setInput(
+          payload.new.cell_id, 
+          payload.new.letter,
+          payload.new.player_color
+        );
       } else if (payload.eventType === 'DELETE') {
         useCrosswordStore.getState().clearInput(payload.old?.cell_id || '');
       }
@@ -123,6 +127,35 @@ function App() {
   useEffect(() => {
     localStorage.setItem('playerName', playerName);
   }, [playerName]);
+
+  // Сохраняем изменения в БД при мультиплеере
+  useEffect(() => {
+    if (!isMultiplayer || !roomId || !playerId) return;
+
+    // Подписываемся на изменения в cells
+    const unsubscribe = useCrosswordStore.subscribe((state, prevState) => {
+      if (state.cells !== prevState.cells) {
+        // Находим измененные клетки
+        state.cells.forEach((cell, index) => {
+          const prevCell = prevState.cells[index];
+          if (cell.userInput !== prevCell.userInput) {
+            // Клетка изменилась
+            if (cell.userInput) {
+              // Буква добавлена/изменена
+              saveLetter(roomId, playerId, cell.id, cell.userInput, myColor);
+            } else {
+              // Буква удалена
+              deleteLetter(roomId, playerId, cell.id);
+            }
+          }
+        });
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [isMultiplayer, roomId, playerId, myColor]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -186,7 +219,11 @@ function App() {
     setLoading(false);
   };
 
-  const handleLeaveMultiplayer = () => {
+  const handleLeaveMultiplayer = async () => {
+    if (roomId && playerId) {
+      const { leaveRoom } = await import('./services/multiplayerApi');
+      await leaveRoom(roomId, playerId);
+    }
     setIsMultiplayer(false);
     setRoomId(null);
     setPlayerId(null);
@@ -367,7 +404,7 @@ function App() {
           {/* Grid */}
           <div className="flex-1 flex justify-center min-w-0">
             <DraggableGrid>
-              {crossword && <CrosswordGrid crossword={crossword} />}
+              {crossword && <CrosswordGrid crossword={crossword} playerColor={isMultiplayer ? myColor : undefined} />}
             </DraggableGrid>
           </div>
 

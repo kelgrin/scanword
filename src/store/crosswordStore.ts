@@ -15,7 +15,7 @@ interface CrosswordState {
   reset: () => void;
   setActiveCell: (cellId: string | null, wordId?: string) => void;
   setActiveWord: (wordId: string | null) => void;
-  setInput: (cellId: string, value: string) => void;
+  setInput: (cellId: string, value: string, playerColor?: string) => void;
   clearInput: (cellId: string) => void;
   checkWords: () => void;
   getWordCells: (wordId: string) => Cell[];
@@ -93,10 +93,16 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
     set({ activeWordId: wordId });
   },
 
-  setInput: (cellId: string, value: string) => {
+  setInput: (cellId: string, value: string, playerColor?: string) => {
     set((state) => ({
       cells: state.cells.map((cell) =>
-        cell.id === cellId ? { ...cell, userInput: value.toUpperCase().slice(-1) } : cell
+        cell.id === cellId 
+          ? { 
+              ...cell, 
+              userInput: value.toUpperCase().slice(-1),
+              playerColor: playerColor || cell.playerColor
+            } 
+          : cell
       ),
     }));
     // Check words after input
@@ -106,7 +112,7 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
   clearInput: (cellId: string) => {
     set((state) => ({
       cells: state.cells.map((cell) =>
-        cell.id === cellId ? { ...cell, userInput: '' } : cell
+        cell.id === cellId ? { ...cell, userInput: '', playerColor: undefined } : cell
       ),
     }));
   },
