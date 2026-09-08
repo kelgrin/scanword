@@ -100,7 +100,7 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
           style={{ gridColumn: cell.x + 1, gridRow: cell.y + 1 }}
           onClick={handleClueClick}
         >
-          <span className="text-[7px] leading-[1.2] text-gray-600 text-center px-0.5 overflow-hidden line-clamp-2 font-medium">
+          <span className="text-[9px] leading-[1.3] text-gray-700 text-center px-1 overflow-hidden font-medium">
             {cell.clueText}
           </span>
           <div className="mt-0.5">

@@ -11,8 +11,8 @@
 @layer components {
   .crossword-grid > * {
     aspect-ratio: 1;
-    min-width: 48px;
-    min-height: 48px;
+    min-width: 72px;
+    min-height: 72px;
   }
 
   @keyframes fade-in {
