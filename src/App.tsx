@@ -230,6 +230,22 @@ function App() {
     setPlayers([]);
   };
 
+  const handleManualSync = async () => {
+    if (!roomId) return;
+    
+    // Синхронизировать буквы
+    const { getRoomLetters } = await import('./services/multiplayerApi');
+    const letters = await getRoomLetters(roomId);
+    letters.forEach((letter) => {
+      useCrosswordStore.getState().setInput(letter.cell_id, letter.letter, letter.player_color);
+    });
+    
+    // Синхронизировать игроков
+    const { getRoomPlayers } = await import('./services/multiplayerApi');
+    const playersList = await getRoomPlayers(roomId);
+    setPlayers(playersList);
+  };
+
   const isCompleted = totalWords > 0 && solvedCount === totalWords;
 
   // Show multiplayer page
@@ -332,12 +348,23 @@ function App() {
 
             {/* Leave multiplayer button */}
             {isMultiplayer && (
-              <button
-                onClick={handleLeaveMultiplayer}
-                className="flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-red-500 to-orange-600 text-white rounded-lg hover:from-red-600 hover:to-orange-700 transition-all shadow-md hover:shadow-lg active:scale-95"
-              >
-                <span className="hidden sm:inline text-sm">Выйти</span>
-              </button>
+              <>
+                <button
+                  onClick={handleManualSync}
+                  className="flex items-center gap-1 px-2 py-1.5 bg-gradient-to-r from-blue-500 to-cyan-600 text-white rounded-lg hover:from-blue-600 hover:to-cyan-700 transition-all shadow-md hover:shadow-lg active:scale-95"
+                  title="Синхронизировать"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+                <button
+                  onClick={handleLeaveMultiplayer}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-red-500 to-orange-600 text-white rounded-lg hover:from-red-600 hover:to-orange-700 transition-all shadow-md hover:shadow-lg active:scale-95"
+                >
+                  <span className="hidden sm:inline text-sm">Выйти</span>
+                </button>
+              </>
             )}
 
             {/* New crossword button */}
@@ -416,7 +443,7 @@ function App() {
 
         {/* Multiplayer players indicator */}
         {isMultiplayer && players.length > 0 && (
-          <div className="mt-4 flex items-center justify-center gap-2">
+          <div className="mt-4 flex items-center justify-center gap-2 flex-wrap">
             <span className="text-sm text-gray-600 dark:text-gray-400">Игроки:</span>
             {players.map((player) => (
               <div
@@ -428,6 +455,10 @@ function App() {
                 {player.player_id === playerId && ' (вы)'}
               </div>
             ))}
+            <div className="flex items-center gap-1 ml-2">
+              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" title="Синхронизация активна" />
+              <span className="text-xs text-gray-500 dark:text-gray-400">Online</span>
+            </div>
           </div>
         )}
       </main>

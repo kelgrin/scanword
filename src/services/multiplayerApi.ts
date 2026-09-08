@@ -192,12 +192,65 @@ export async function getRoomPlayers(roomId: string): Promise<Player[]> {
   return data || [];
 }
 
-// Подписаться на изменения состояния игры
+// Подписаться на изменения состояния игры с fallback на polling
 export function subscribeToGameState(
   roomId: string,
   callback: (payload: { eventType: string; new: GameState; old?: GameState }) => void
 ) {
-  return supabase
+  let pollingInterval: ReturnType<typeof setInterval> | null = null;
+  let lastKnownState: Map<string, string> = new Map();
+  let isConnected = false;
+
+  // Polling fallback
+  const startPolling = () => {
+    if (pollingInterval) return;
+    console.log('[Multiplayer] Starting polling fallback for game state');
+    
+    pollingInterval = setInterval(async () => {
+      try {
+        const letters = await getRoomLetters(roomId);
+        const currentState = new Map(letters.map(l => [l.cell_id, l.letter]));
+        
+        // Detect changes
+        currentState.forEach((letter, cellId) => {
+          const prevLetter = lastKnownState.get(cellId);
+          if (prevLetter !== letter) {
+            const gameState = letters.find(l => l.cell_id === cellId);
+            if (gameState) {
+              callback({
+                eventType: prevLetter ? 'UPDATE' : 'INSERT',
+                new: gameState,
+              });
+            }
+          }
+        });
+        
+        // Detect deletions
+        lastKnownState.forEach((letter, cellId) => {
+          if (!currentState.has(cellId)) {
+            callback({
+              eventType: 'DELETE',
+              new: { room_id: roomId, player_id: '', cell_id: cellId, letter: '' } as GameState,
+            });
+          }
+        });
+        
+        lastKnownState = currentState;
+      } catch (error) {
+        console.error('[Multiplayer] Polling error:', error);
+      }
+    }, 2000); // Poll every 2 seconds
+  };
+
+  const stopPolling = () => {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      pollingInterval = null;
+    }
+  };
+
+  // Try WebSocket first
+  const channel = supabase
     .channel(`game-state-${roomId}`)
     .on(
       'postgres_changes',
@@ -208,6 +261,8 @@ export function subscribeToGameState(
         filter: `room_id=eq.${roomId}`,
       },
       (payload) => {
+        isConnected = true;
+        stopPolling(); // Stop polling if WebSocket works
         callback({
           eventType: payload.eventType,
           new: payload.new as GameState,
@@ -215,15 +270,97 @@ export function subscribeToGameState(
         });
       }
     )
-    .subscribe();
+    .subscribe((status) => {
+      console.log('[Multiplayer] WebSocket status:', status);
+      if (status === 'SUBSCRIBED') {
+        isConnected = true;
+        stopPolling();
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        console.warn('[Multiplayer] WebSocket connection failed, switching to polling');
+        isConnected = false;
+        startPolling();
+      }
+    });
+
+  // Start polling after 3 seconds if WebSocket doesn't connect
+  setTimeout(() => {
+    if (!isConnected) {
+      console.log('[Multiplayer] WebSocket timeout, starting polling fallback');
+      startPolling();
+    }
+  }, 3000);
+
+  // Initialize last known state
+  getRoomLetters(roomId).then(letters => {
+    lastKnownState = new Map(letters.map(l => [l.cell_id, l.letter]));
+  });
+
+  return {
+    unsubscribe: () => {
+      channel.unsubscribe();
+      stopPolling();
+    },
+  };
 }
 
-// Подписаться на изменения игроков
+// Подписаться на изменения игроков с fallback на polling
 export function subscribeToPlayers(
   roomId: string,
   callback: (payload: { eventType: string; new: Player }) => void
 ) {
-  return supabase
+  let pollingInterval: ReturnType<typeof setInterval> | null = null;
+  let lastKnownPlayers: Map<string, string> = new Map();
+  let isConnected = false;
+
+  // Polling fallback
+  const startPolling = () => {
+    if (pollingInterval) return;
+    console.log('[Multiplayer] Starting polling fallback for players');
+    
+    pollingInterval = setInterval(async () => {
+      try {
+        const players = await getRoomPlayers(roomId);
+        const currentPlayers = new Map(players.map(p => [p.player_id, p.player_name]));
+        
+        // Detect new players
+        currentPlayers.forEach((name, id) => {
+          if (!lastKnownPlayers.has(id)) {
+            const player = players.find(p => p.player_id === id);
+            if (player) {
+              callback({
+                eventType: 'INSERT',
+                new: player,
+              });
+            }
+          }
+        });
+        
+        // Detect removed players
+        lastKnownPlayers.forEach((name, id) => {
+          if (!currentPlayers.has(id)) {
+            callback({
+              eventType: 'DELETE',
+              new: { room_id: roomId, player_id: id, player_name: name, color: '', joined_at: '' } as Player,
+            });
+          }
+        });
+        
+        lastKnownPlayers = currentPlayers;
+      } catch (error) {
+        console.error('[Multiplayer] Players polling error:', error);
+      }
+    }, 3000); // Poll every 3 seconds
+  };
+
+  const stopPolling = () => {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      pollingInterval = null;
+    }
+  };
+
+  // Try WebSocket first
+  const channel = supabase
     .channel(`players-${roomId}`)
     .on(
       'postgres_changes',
@@ -234,13 +371,42 @@ export function subscribeToPlayers(
         filter: `room_id=eq.${roomId}`,
       },
       (payload) => {
+        isConnected = true;
+        stopPolling();
         callback({
           eventType: payload.eventType,
           new: payload.new as Player,
         });
       }
     )
-    .subscribe();
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        isConnected = true;
+        stopPolling();
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        isConnected = false;
+        startPolling();
+      }
+    });
+
+  // Start polling after 3 seconds if WebSocket doesn't connect
+  setTimeout(() => {
+    if (!isConnected) {
+      startPolling();
+    }
+  }, 3000);
+
+  // Initialize last known players
+  getRoomPlayers(roomId).then(players => {
+    lastKnownPlayers = new Map(players.map(p => [p.player_id, p.player_name]));
+  });
+
+  return {
+    unsubscribe: () => {
+      channel.unsubscribe();
+      stopPolling();
+    },
+  };
 }
 
 // Отправить сообщение в чат
@@ -277,12 +443,52 @@ export async function getChatMessages(roomId: string): Promise<ChatMessage[]> {
   return data || [];
 }
 
-// Подписаться на новые сообщения чата
+// Подписаться на новые сообщения чата с fallback на polling
 export function subscribeToChat(
   roomId: string,
   callback: (payload: { new: ChatMessage }) => void
 ) {
-  return supabase
+  let pollingInterval: ReturnType<typeof setInterval> | null = null;
+  let lastKnownMessageId: string | null = null;
+  let isConnected = false;
+
+  // Polling fallback
+  const startPolling = () => {
+    if (pollingInterval) return;
+    console.log('[Chat] Starting polling fallback');
+    
+    pollingInterval = setInterval(async () => {
+      try {
+        const messages = await getChatMessages(roomId);
+        if (messages.length > 0) {
+          const latestMessage = messages[messages.length - 1];
+          if (lastKnownMessageId !== latestMessage.id) {
+            // Find new messages
+            const lastIdx = messages.findIndex(m => m.id === lastKnownMessageId);
+            const newMessages = lastIdx === -1 ? messages : messages.slice(lastIdx + 1);
+            
+            newMessages.forEach(msg => {
+              callback({ new: msg });
+            });
+            
+            lastKnownMessageId = latestMessage.id;
+          }
+        }
+      } catch (error) {
+        console.error('[Chat] Polling error:', error);
+      }
+    }, 2000); // Poll every 2 seconds
+  };
+
+  const stopPolling = () => {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      pollingInterval = null;
+    }
+  };
+
+  // Try WebSocket first
+  const channel = supabase
     .channel(`chat-${roomId}`)
     .on(
       'postgres_changes',
@@ -293,10 +499,44 @@ export function subscribeToChat(
         filter: `room_id=eq.${roomId}`,
       },
       (payload) => {
+        isConnected = true;
+        stopPolling();
         callback({ new: payload.new as ChatMessage });
       }
     )
-    .subscribe();
+    .subscribe((status) => {
+      console.log('[Chat] WebSocket status:', status);
+      if (status === 'SUBSCRIBED') {
+        isConnected = true;
+        stopPolling();
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        console.warn('[Chat] WebSocket connection failed, switching to polling');
+        isConnected = false;
+        startPolling();
+      }
+    });
+
+  // Start polling after 3 seconds if WebSocket doesn't connect
+  setTimeout(() => {
+    if (!isConnected) {
+      console.log('[Chat] WebSocket timeout, starting polling fallback');
+      startPolling();
+    }
+  }, 3000);
+
+  // Initialize last known message
+  getChatMessages(roomId).then(messages => {
+    if (messages.length > 0) {
+      lastKnownMessageId = messages[messages.length - 1].id;
+    }
+  });
+
+  return {
+    unsubscribe: () => {
+      channel.unsubscribe();
+      stopPolling();
+    },
+  };
 }
 
 // Покинуть комнату

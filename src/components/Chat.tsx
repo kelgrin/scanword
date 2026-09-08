@@ -17,21 +17,35 @@ const Chat: React.FC<ChatProps> = ({ roomId, playerId, playerName }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isOpen, setIsOpen] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Загружаем историю сообщений
-    getChatMessages(roomId).then(setMessages);
+    getChatMessages(roomId).then((msgs) => {
+      setMessages(msgs);
+      setIsConnected(true);
+    });
 
     // Подписываемся на новые сообщения
     const subscription = subscribeToChat(roomId, (payload) => {
-      setMessages((prev) => [...prev, payload.new]);
+      setMessages((prev) => {
+        // Avoid duplicates
+        if (prev.some(m => m.id === payload.new.id)) return prev;
+        return [...prev, payload.new];
+      });
+      setIsConnected(true);
     });
 
     return () => {
       subscription.unsubscribe();
     };
   }, [roomId]);
+
+  const handleManualSync = async () => {
+    const msgs = await getChatMessages(roomId);
+    setMessages(msgs);
+  };
 
   useEffect(() => {
     // Прокрутка к последнему сообщению
@@ -71,13 +85,25 @@ const Chat: React.FC<ChatProps> = ({ roomId, playerId, playerName }) => {
         <div className="flex items-center gap-2">
           <MessageSquare className="w-5 h-5" />
           <span className="font-semibold">Чат</span>
+          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400' : 'bg-yellow-400 animate-pulse'}`} title={isConnected ? 'Подключено' : 'Подключение...'} />
         </div>
-        <button
-          onClick={() => setIsOpen(false)}
-          className="hover:bg-white/20 p-1 rounded transition-colors"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={handleManualSync}
+            className="hover:bg-white/20 p-1 rounded transition-colors"
+            title="Синхронизировать"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+          <button
+            onClick={() => setIsOpen(false)}
+            className="hover:bg-white/20 p-1 rounded transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* Messages */}
