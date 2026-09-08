@@ -359,21 +359,32 @@ export async function generateCrossword(targetWordCount: number = 15): Promise<C
     });
 
     // Пытаемся разместить остальные слова
+    // Сначала длинные (для большего количества пересечений), потом короткие
     const remaining = sorted.slice(1);
-    const shuffledRemaining = shuffleArray(remaining);
+    
+    // Разделяем на длинные (>= 5 букв) и короткие
+    const longWords = remaining.filter((w: WordEntry) => w.word.length >= 5);
+    const shortWords = remaining.filter((w: WordEntry) => w.word.length < 5);
+    
+    // Перемешиваем внутри каждой группы
+    const orderedWords = [...shuffleArray(longWords), ...shuffleArray(shortWords)];
 
-    for (const entry of shuffledRemaining) {
+    for (const entry of orderedWords) {
       if (placedWords.length >= targetWordCount) break;
 
       const placements = findPossiblePlacements(entry as WordEntry, grid, placedWords, gridSize);
       if (placements.length === 0) continue;
 
       // Выбираем размещение с наибольшим количеством пересечений, ближе к центру
+      // Длинные слова получают больший приоритет на пересечения
       placements.sort((a, b) => {
         const distA = Math.abs(a.startX - center) + Math.abs(a.startY - center);
         const distB = Math.abs(b.startX - center) + Math.abs(b.startY - center);
-        if (b.intersections !== a.intersections) return b.intersections - a.intersections;
-        return distA - distB;
+        const wordLength = entry.word.length;
+        const intersectionWeight = wordLength >= 6 ? 3 : wordLength >= 4 ? 2 : 1;
+        const scoreA = a.intersections * intersectionWeight - distA * 0.1;
+        const scoreB = b.intersections * intersectionWeight - distB * 0.1;
+        return scoreB - scoreA;
       });
 
       const best = placements[0];

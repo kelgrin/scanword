@@ -39,7 +39,7 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
   words: [],
   activeCellId: null,
   activeWordId: null,
-  hints: 5,
+  hints: 10,
   hintCells: new Set<string>(),
 
   loadCrossword: (data: CrosswordData) => {
@@ -49,7 +49,7 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
       words: data.words,
       activeCellId: null,
       activeWordId: null,
-      hints: 5,
+      hints: 10,
       hintCells: new Set<string>(),
     });
   },
@@ -61,7 +61,7 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
       words: [],
       activeCellId: null,
       activeWordId: null,
-      hints: 5,
+      hints: 10,
       hintCells: new Set<string>(),
     });
   },
