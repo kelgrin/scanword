@@ -11,7 +11,7 @@ interface CrosswordState {
   // Actions
   loadCrossword: (data: CrosswordData) => void;
   reset: () => void;
-  setActiveCell: (cellId: string | null) => void;
+  setActiveCell: (cellId: string | null, wordId?: string) => void;
   setActiveWord: (wordId: string | null) => void;
   setInput: (cellId: string, value: string) => void;
   clearInput: (cellId: string) => void;
@@ -21,6 +21,7 @@ interface CrosswordState {
   isCellInActiveWord: (cellId: string) => boolean;
   isCellSolved: (cellId: string) => boolean;
   getClueForCell: (cellId: string) => { clueText: string; wordId: string } | null;
+  getSolvedWordForCell: (cellId: string) => { clueText: string; wordId: string; wordText: string } | null;
   getProgress: () => { solved: number; total: number };
   getSolvedCount: () => number;
   getNextCellInWord: (cellId: string, wordId: string) => string | null;
@@ -54,7 +55,7 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
     });
   },
 
-  setActiveCell: (cellId: string | null) => {
+  setActiveCell: (cellId: string | null, wordId?: string) => {
     const state = get();
     if (!cellId) {
       set({ activeCellId: null, activeWordId: null });
@@ -64,12 +65,16 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
     const cell = state.cells.find((c) => c.id === cellId);
     if (!cell) return;
 
-    // Find which word this cell belongs to
-    const word = state.words.find((w) => w.cells.includes(cellId));
+    // If wordId is provided, use it. Otherwise, find which word this cell belongs to
+    let resolvedWordId = wordId ?? null;
+    if (!resolvedWordId) {
+      const word = state.words.find((w) => w.cells.includes(cellId));
+      resolvedWordId = word ? word.id : state.activeWordId;
+    }
 
     set({
       activeCellId: cellId,
-      activeWordId: word ? word.id : state.activeWordId,
+      activeWordId: resolvedWordId,
     });
   },
 
@@ -143,6 +148,20 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
     const word = state.words.find((w) => w.cells.includes(cellId));
     if (!word) return null;
     return { clueText: word.clueText, wordId: word.id };
+  },
+
+  getSolvedWordForCell: (cellId: string) => {
+    const state = get();
+    // Find solved word that contains this cell
+    const solvedWord = state.words.find((w) => w.isSolved && w.cells.includes(cellId));
+    if (!solvedWord) return null;
+    
+    // Get the word text from cells
+    const wordText = solvedWord.cells
+      .map((cid) => state.cells.find((c) => c.id === cid)?.userInput || '')
+      .join('');
+    
+    return { clueText: solvedWord.clueText, wordId: solvedWord.id, wordText };
   },
 
   getProgress: () => {

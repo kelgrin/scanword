@@ -1,4 +1,4 @@
-import React, { forwardRef, useState } from 'react';
+import React, { forwardRef, useState, useEffect, useRef } from 'react';
 import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from 'lucide-react';
 import { Cell as CellType } from '../types/crossword';
 import { useCrosswordStore } from '../store/crosswordStore';
@@ -17,7 +17,21 @@ interface CellProps {
 const Cell = forwardRef<HTMLInputElement, CellProps>(
   ({ cell, isActive, isInActiveWord, isSolved, onFocus, onInput, onKeyDown }, ref) => {
     const [showTooltip, setShowTooltip] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
     const words = useCrosswordStore((s) => s.words);
+    const getSolvedWordForCell = useCrosswordStore((s) => s.getSolvedWordForCell);
+
+    // Close tooltip when clicking outside
+    useEffect(() => {
+      if (!showTooltip) return;
+      const handleClickOutside = (e: MouseEvent) => {
+        if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+          setShowTooltip(false);
+        }
+      };
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showTooltip]);
 
     const handleClueClick = () => {
       if (cell.targetWordId) {
@@ -37,6 +51,13 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
         setShowTooltip(!showTooltip);
       } else {
         onFocus(cell.id);
+      }
+    };
+
+    const handleInputClick = (e: React.MouseEvent) => {
+      if (isSolved) {
+        e.stopPropagation();
+        setShowTooltip(!showTooltip);
       }
     };
 
@@ -70,6 +91,7 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
 
       return (
         <div
+          ref={containerRef}
           className={`relative flex flex-col items-center justify-center rounded-sm border transition-all duration-200 cursor-pointer overflow-hidden
             ${isWordSolved ? 'bg-green-100 border-green-300' : 'bg-amber-50 border-amber-200'}
             ${isActive ? 'ring-2 ring-blue-500 z-10' : ''}
@@ -86,6 +108,12 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
           {showTooltip && targetWord && (
             <ClueTooltip
               text={targetWord.clueText}
+              wordText={targetWord.cells
+                .map((cid) => {
+                  const c = useCrosswordStore.getState().cells.find((cc) => cc.id === cid);
+                  return c?.userInput || '';
+                })
+                .join('')}
               onClose={() => setShowTooltip(false)}
               x={cell.x}
               y={cell.y}
@@ -96,10 +124,12 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
     }
 
     // Empty cell with input
-    const clueInfo = useCrosswordStore.getState().getClueForCell(cell.id);
+    // FIX bug #4: use getSolvedWordForCell to find the correct solved word
+    const solvedWordInfo = isSolved ? getSolvedWordForCell(cell.id) : null;
 
     return (
       <div
+        ref={containerRef}
         className={`relative flex items-center justify-center rounded-sm border transition-all duration-200
           ${isSolved ? 'bg-green-100 border-green-300 cursor-pointer' : ''}
           ${isInActiveWord && !isSolved ? 'bg-yellow-100 border-yellow-300' : ''}
@@ -115,12 +145,14 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
           value={cell.userInput}
           onChange={(e) => onInput(cell.id, e.target.value)}
           onKeyDown={(e) => onKeyDown(e, cell.id)}
+          onClick={handleInputClick}
           onFocus={() => {
             if (!isSolved) {
               onFocus(cell.id);
             }
           }}
           readOnly={isSolved}
+          tabIndex={isSolved ? -1 : 0}
           maxLength={2}
           className={`w-full h-full text-center text-lg font-bold bg-transparent outline-none uppercase
             ${isSolved ? 'text-green-700 cursor-pointer' : 'text-gray-800 cursor-pointer'}
@@ -130,9 +162,10 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
           autoCapitalize="characters"
           spellCheck={false}
         />
-        {showTooltip && clueInfo && (
+        {showTooltip && solvedWordInfo && (
           <ClueTooltip
-            text={clueInfo.clueText}
+            text={solvedWordInfo.clueText}
+            wordText={solvedWordInfo.wordText}
             onClose={() => setShowTooltip(false)}
             x={cell.x}
             y={cell.y}

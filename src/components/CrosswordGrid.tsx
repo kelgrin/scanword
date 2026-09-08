@@ -43,7 +43,7 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword }) => {
     }
   }, [activeCellId]);
 
-  // Handle clue cell click - focus first letter of target word
+  // Handle clue cell click - focus first letter of target word (FIX for bug #3)
   const handleCellFocus = useCallback(
     (cellId: string) => {
       const cell = cells.find((c) => c.id === cellId);
@@ -52,16 +52,25 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword }) => {
       if (cell.type === 'clue' && cell.targetWordId) {
         const word = words.find((w) => w.id === cell.targetWordId);
         if (word && word.cells.length > 0) {
-          setActiveCell(word.cells[0]);
+          // FIX bug #3: First set the word, then set the cell with explicit wordId
+          // so that setActiveCell doesn't override the word selection
           setActiveWord(word.id);
+          setActiveCell(word.cells[0], word.id);
         }
       } else if (cell.type === 'empty') {
         // Find which word this cell belongs to
-        const word = words.find((w) => w.cells.includes(cellId));
-        setActiveCell(cellId);
-        if (word) {
-          setActiveWord(word.id);
+        // If cell is on intersection, prefer the currently active word if it contains this cell
+        const currentWordId = useCrosswordStore.getState().activeWordId;
+        const currentWord = currentWordId ? words.find((w) => w.id === currentWordId) : null;
+        
+        let word;
+        if (currentWord && currentWord.cells.includes(cellId)) {
+          word = currentWord;
+        } else {
+          word = words.find((w) => w.cells.includes(cellId));
         }
+        
+        setActiveCell(cellId, word?.id);
       }
     },
     [cells, words, setActiveCell, setActiveWord]
@@ -76,7 +85,7 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword }) => {
 
       setInput(cellId, letter);
 
-      // Auto-advance to next cell
+      // Auto-advance to next cell — preserve active word (FIX for bug #2)
       const currentActiveWordId = useCrosswordStore.getState().activeWordId;
       if (currentActiveWordId) {
         const nextCellId = getNextCellInWord(cellId, currentActiveWordId);
@@ -84,7 +93,8 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword }) => {
           const nextCell = cells.find((c) => c.id === nextCellId);
           if (nextCell && nextCell.type === 'empty' && !isCellSolved(nextCellId)) {
             setTimeout(() => {
-              setActiveCell(nextCellId);
+              // FIX bug #2: pass wordId explicitly so it doesn't get overridden
+              setActiveCell(nextCellId, currentActiveWordId);
             }, 10);
           }
         }
@@ -99,14 +109,19 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword }) => {
       const currentActiveWordId = useCrosswordStore.getState().activeWordId;
 
       if (e.key === 'Backspace') {
+        e.preventDefault(); // FIX bug #1: always prevent default for Backspace
         const cell = cells.find((c) => c.id === cellId);
-        if (cell && cell.userInput === '' && currentActiveWordId) {
-          // Move to previous cell and clear it
+        if (!cell) return;
+
+        if (cell.userInput !== '') {
+          // Cell has content — clear it
+          clearInput(cellId);
+        } else if (currentActiveWordId) {
+          // Cell is empty — move to previous cell and clear it
           const prevCellId = getPrevCellInWord(cellId, currentActiveWordId);
           if (prevCellId) {
-            e.preventDefault();
             clearInput(prevCellId);
-            setActiveCell(prevCellId);
+            setActiveCell(prevCellId, currentActiveWordId);
           }
         }
         return;
@@ -133,24 +148,22 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword }) => {
         );
         if (targetCell) {
           const word = words.find((w) => w.cells.includes(targetCell.id));
-          setActiveCell(targetCell.id);
-          if (word) {
-            setActiveWord(word.id);
-          }
+          setActiveCell(targetCell.id, word?.id);
         }
         return;
       }
 
       if (e.key === 'Tab') {
         e.preventDefault();
+        // Move to next word
         const currentIdx = words.findIndex((w) => w.id === currentActiveWordId);
         const nextIdx = e.shiftKey
           ? (currentIdx - 1 + words.length) % words.length
           : (currentIdx + 1) % words.length;
         const nextWord = words[nextIdx];
         if (nextWord && nextWord.cells.length > 0) {
-          setActiveCell(nextWord.cells[0]);
           setActiveWord(nextWord.id);
+          setActiveCell(nextWord.cells[0], nextWord.id);
         }
       }
     },
