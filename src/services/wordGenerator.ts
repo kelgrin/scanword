@@ -204,8 +204,51 @@ function canPlaceWord(
           hasIntersection = true;
         }
       }
-      // УБРАЛИ строгую проверку соседей для пустых клеток
-      // Это позволяет словам быть близко друг к другу
+      
+      // ПРОВЕРКА НА СЛИПАНИЕ: проверяем перпендикулярных соседей
+      if (direction === 'horizontal') {
+        // Проверяем клетки сверху и снизу
+        for (const dy of [-1, 1]) {
+          const neighborY = y + dy;
+          if (neighborY >= 0 && neighborY < gridSize) {
+            const neighbor = grid.get(`${x},${neighborY}`);
+            if (neighbor && neighbor.letter !== null) {
+              // Проверяем, не является ли это пересечением с текущим словом
+              const isIntersection = placedWords.some(pw => {
+                const pwVector = getWordDirectionVector(pw.direction);
+                for (let j = 0; j < pw.word.length; j++) {
+                  const pwX = pw.startX + pwVector.dx * j;
+                  const pwY = pw.startY + pwVector.dy * j;
+                  if (pwX === x && pwY === y) return true;
+                }
+                return false;
+              });
+              if (!isIntersection) return false; // Слова слипаются
+            }
+          }
+        }
+      } else {
+        // Проверяем клетки слева и справа
+        for (const dx of [-1, 1]) {
+          const neighborX = x + dx;
+          if (neighborX >= 0 && neighborX < gridSize) {
+            const neighbor = grid.get(`${neighborX},${y}`);
+            if (neighbor && neighbor.letter !== null) {
+              // Проверяем, не является ли это пересечением с текущим словом
+              const isIntersection = placedWords.some(pw => {
+                const pwVector = getWordDirectionVector(pw.direction);
+                for (let j = 0; j < pw.word.length; j++) {
+                  const pwX = pw.startX + pwVector.dx * j;
+                  const pwY = pw.startY + pwVector.dy * j;
+                  if (pwX === x && pwY === y) return true;
+                }
+                return false;
+              });
+              if (!isIntersection) return false; // Слова слипаются
+            }
+          }
+        }
+      }
     }
 
   // Проверяем клетку ПОСЛЕ слова (не должна быть буквой, чтобы слова не слипались)
@@ -271,7 +314,7 @@ function findPossiblePlacements(
 // ============================================================
 // Основной генератор
 // ============================================================
-export async function generateCrossword(targetWordCount: number = 25): Promise<CrosswordData> {
+export async function generateCrossword(targetWordCount: number = 20): Promise<CrosswordData> {
   const gridSize = 35;
   const maxAttempts = 200;
 
