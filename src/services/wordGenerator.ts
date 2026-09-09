@@ -242,6 +242,56 @@ function canPlaceWord(
     }
   }
 
+  // ВАЖНО: Проверяем, что clue-клетки не находятся ВНУТРИ других слов
+  // Clue-клетка должна быть СНАРУЖИ слова, а не посреди него
+  for (const pw of placedWords) {
+    const pwVector = getWordDirectionVector(pw.direction);
+    for (const cluePos of cluePositions) {
+      // Проверяем, находится ли clue-клетка на линии слова
+      if (pw.direction === 'horizontal') {
+        // Горизонтальное слово
+        if (cluePos.y === pw.startY) {
+          // На одной строке - проверяем, внутри ли слова
+          if (cluePos.x > pw.startX && cluePos.x < pw.startX + pw.word.length) {
+            return false; // Clue-клетка внутри слова
+          }
+          // Проверяем, не находится ли clue-клетка на продолжении слова
+          // (сразу после конца или сразу перед началом без промежутка)
+          if (cluePos.x === pw.startX + pw.word.length || cluePos.x === pw.startX - 1) {
+            // Clue-клетка на продолжении слова - это нормально, если это clue для ДРУГОГО слова
+            // Но если это clue для текущего слова, то слово должно начинаться/заканчиваться здесь
+            // Проверяем, не является ли эта позиция началом или концом текущего слова
+            const isCurrentWordStart = cluePos.x === startX && cluePos.y === startY;
+            const isCurrentWordEnd = cluePos.x === startX + len - 1 && cluePos.y === startY;
+            if (!isCurrentWordStart && !isCurrentWordEnd) {
+              // Clue-клетка на продолжении другого слова - это ошибка
+              return false;
+            }
+          }
+        }
+      } else if (pw.direction === 'vertical') {
+        // Вертикальное слово
+        if (cluePos.x === pw.startX) {
+          // На одном столбце - проверяем, внутри ли слова
+          if (cluePos.y > pw.startY && cluePos.y < pw.startY + pw.word.length) {
+            return false; // Clue-клетка внутри слова
+          }
+          // Проверяем, не находится ли clue-клетка на продолжении слова
+          if (cluePos.y === pw.startY + pw.word.length || cluePos.y === pw.startY - 1) {
+            // Clue-клетка на продолжении слова - это нормально, если это clue для ДРУГОГО слова
+            // Но если это clue для текущего слова, то слово должно начинаться/заканчиваться здесь
+            const isCurrentWordStart = cluePos.x === startX && cluePos.y === startY;
+            const isCurrentWordEnd = cluePos.x === startX && cluePos.y === startY + len - 1;
+            if (!isCurrentWordStart && !isCurrentWordEnd) {
+              // Clue-клетка на продолжении другого слова - это ошибка
+              return false;
+            }
+          }
+        }
+      }
+    }
+  }
+
   // Проверяем каждую клетку слова
   let hasIntersection = false;
   for (let i = 0; i < len; i++) {
@@ -261,43 +311,48 @@ function canPlaceWord(
     }
   }
 
-  // ВАЖНО: Проверяем, что на одной линии нет двух слов в одном направлении
+  // ВАЖНО: Проверяем, что на одной линии нет двух слов в одном направлении ПОДРЯД
   // На одной линии до упора в неактивный блок может быть только одно слово
+  // Но разрешены ответвления (пересечения)
   for (const pw of placedWords) {
-    const pwVector = getWordDirectionVector(pw.direction);
-    
     // Проверяем только если оба слова в одном направлении
     if (pw.direction === direction) {
-      // Проверяем, находятся ли слова на одной линии
       if (direction === 'horizontal') {
         // Оба горизонтальные - проверяем, на одной ли они строке
         if (pw.startY === startY) {
-          // На одной строке - проверяем, не продолжаются ли они
-          const pwEndX = pw.startX + pw.word.length - 1;
-          const wordEndX = startX + len - 1;
+          // На одной строке - проверяем, не идут ли они подряд
+          const pwEndX = pw.startX + pw.word.length;
+          const wordEndX = startX + len;
           
-          // Если слова на одной строке и не пересекаются - это ошибка
-          if (!hasIntersection) {
-            // Проверяем, не идут ли они подряд
-            if ((pwEndX + 1 === startX) || (wordEndX + 1 === pw.startX)) {
-              return false; // Слова идут подряд на одной линии
-            }
+          // Если слова идут подряд без промежутка - это ошибка
+          // Проверяем, есть ли хотя бы одна пустая клетка между ними
+          const gap = Math.max(startX - pwEndX, pw.startX - wordEndX);
+          if (gap < 0) {
+            // Слова перекрываются - это нормально (пересечение)
+            continue;
+          } else if (gap === 0) {
+            // Слова идут подряд без промежутка - это ошибка
+            return false;
           }
+          // Если gap > 0, есть хотя бы одна пустая клетка между словами - это нормально
         }
       } else if (direction === 'vertical') {
         // Оба вертикальные - проверяем, на одном ли они столбце
         if (pw.startX === startX) {
-          // На одном столбце - проверяем, не продолжаются ли они
-          const pwEndY = pw.startY + pw.word.length - 1;
-          const wordEndY = startY + len - 1;
+          // На одном столбце - проверяем, не идут ли они подряд
+          const pwEndY = pw.startY + pw.word.length;
+          const wordEndY = startY + len;
           
-          // Если слова на одном столбце и не пересекаются - это ошибка
-          if (!hasIntersection) {
-            // Проверяем, не идут ли они подряд
-            if ((pwEndY + 1 === startY) || (wordEndY + 1 === pw.startY)) {
-              return false; // Слова идут подряд на одной линии
-            }
+          // Если слова идут подряд без промежутка - это ошибка
+          const gap = Math.max(startY - pwEndY, pw.startY - wordEndY);
+          if (gap < 0) {
+            // Слова перекрываются - это нормально (пересечение)
+            continue;
+          } else if (gap === 0) {
+            // Слова идут подряд без промежутка - это ошибка
+            return false;
           }
+          // Если gap > 0, есть хотя бы одна пустая клетка между словами - это нормально
         }
       }
     }
