@@ -29,10 +29,11 @@ const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) =>
         // Добавляем timestamp для уникальности каждой картинки
         const timestamp = Date.now();
         
-        // Используем надёжные API для hentai anime girl
+        // Используем безопасные API для anime girl картинок
         const apis = [
-          `https://api.waifu.pics/nsfw/waifu?timestamp=${timestamp}`,
-          `https://nekos.life/api/v2/img/lewd?timestamp=${timestamp}`
+          `https://api.waifu.pics/sfw/waifu?timestamp=${timestamp}`,
+          `https://nekos.life/api/v2/img/neko?timestamp=${timestamp}`,
+          `https://api.waifu.im/search?included_tags=waifu&many=false&timestamp=${timestamp}`
         ];
         
         for (const api of apis) {

@@ -156,11 +156,11 @@ function canPlaceWord(
     if (x < 0 || x >= gridSize || y < 0 || y >= gridSize) return false;
   }
 
-  // Проверяем clue-клетку (одна клетка ПОСЛЕ слова)
-  // Для horizontal: clue справа от последней буквы
-  // Для vertical: clue снизу от последней буквы
-  const clueX = startX + vector.dx * len;
-  const clueY = startY + vector.dy * len;
+  // Проверяем clue-клетку (одна клетка ПЕРЕД словом)
+  // Для horizontal: clue слева от первой буквы
+  // Для vertical: clue сверху от первой буквы
+  const clueX = startX - vector.dx;
+  const clueY = startY - vector.dy;
   
   if (clueX < 0 || clueX >= gridSize || clueY < 0 || clueY >= gridSize) return false;
   
@@ -171,8 +171,8 @@ function canPlaceWord(
   // Проверяем, что clue-клетка не занята другой clue-клеткой
   for (const pw of placedWords) {
     const pwVector = getWordDirectionVector(pw.direction);
-    const existingClueX = pw.startX + pwVector.dx * pw.word.length;
-    const existingClueY = pw.startY + pwVector.dy * pw.word.length;
+    const existingClueX = pw.startX - pwVector.dx;
+    const existingClueY = pw.startY - pwVector.dy;
     if (existingClueX === clueX && existingClueY === clueY) return false;
   }
 
@@ -474,11 +474,11 @@ function buildCrosswordData(
     }
   }
 
-  // Заполняем clue-клетки ПОСЛЕ слова
+  // Заполняем clue-клетки ПЕРЕД словом
   for (const pw of normalizedWords) {
     const vector = getWordDirectionVector(pw.direction);
-    const clueX = pw.startX + vector.dx * pw.word.length;
-    const clueY = pw.startY + vector.dy * pw.word.length;
+    const clueX = pw.startX - vector.dx;
+    const clueY = pw.startY - vector.dy;
     
     // Стрелка указывает НАПРАВЛЕНИЕ СЛОВА
     const arrowDirection: Direction = pw.direction === 'horizontal' ? 'right' : 'down';
