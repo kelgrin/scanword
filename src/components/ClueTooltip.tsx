@@ -26,10 +26,10 @@ const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) =>
     
     const fetchAnimeImage = async () => {
       try {
-        // Используем несколько API для fallback
+        // Используем несколько API для hentai anime girl
         const apis = [
-          'https://nekos.life/api/v2/img/neko',
-          'https://api.waifu.pics/sfw/waifu',
+          'https://api.waifu.pics/nsfw/waifu',
+          'https://nekos.life/api/v2/img/lewd',
           'https://moe.jitsu.top/img/?sort=setu&size=mw1024'
         ];
         

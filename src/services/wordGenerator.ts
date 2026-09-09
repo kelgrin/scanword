@@ -176,44 +176,25 @@ function canPlaceWord(
     if (existingClueX === clueX && existingClueY === clueY) return false;
   }
 
-  // Проверяем каждую клетку слова
-  let hasIntersection = false;
-  for (let i = 0; i < len; i++) {
-    const x = startX + vector.dx * i;
-    const y = startY + vector.dy * i;
-    const key = `${x},${y}`;
-    const cell = grid.get(key);
-    const letter = word[i];
+    // Проверяем каждую клетку слова
+    let hasIntersection = false;
+    for (let i = 0; i < len; i++) {
+      const x = startX + vector.dx * i;
+      const y = startY + vector.dy * i;
+      const key = `${x},${y}`;
+      const cell = grid.get(key);
+      const letter = word[i];
 
-    if (cell) {
-      if (cell.letter !== null) {
-        // Клетка уже содержит букву — должно быть пересечение
-        if (cell.letter !== letter) return false;
-        hasIntersection = true;
-      }
-    }
-
-    // Проверяем соседние клетки (не должны быть буквами, кроме как продолжение слова)
-    if (!cell || cell.letter === null) {
-      // Проверяем всех 8 соседей
-      for (let dx = -1; dx <= 1; dx++) {
-        for (let dy = -1; dy <= 1; dy++) {
-          if (dx === 0 && dy === 0) continue;
-          
-          // Пропускаем соседей вдоль направления слова
-          const isAlongWord = (dx === vector.dx && dy === vector.dy) || 
-                             (dx === -vector.dx && dy === -vector.dy);
-          if (isAlongWord) continue;
-          
-          const neighbor = grid.get(`${x + dx},${y + dy}`);
-          if (neighbor && neighbor.letter !== null) {
-            return false;
-          }
+      if (cell) {
+        if (cell.letter !== null) {
+          // Клетка уже содержит букву — должно быть пересечение
+          if (cell.letter !== letter) return false;
+          hasIntersection = true;
         }
       }
+      // Убрали строгую проверку соседей для пустых клеток
+      // Это позволяет словам быть близко друг к другу
     }
-  }
-
   // Проверяем клетки ДО и ПОСЛЕ слова (не должны быть буквами)
   const beforeX = startX - vector.dx;
   const beforeY = startY - vector.dy;
