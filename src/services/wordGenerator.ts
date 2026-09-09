@@ -274,7 +274,7 @@ function findPossiblePlacements(
 }
 
 export async function generateCrossword(targetWordCount: number = 20): Promise<CrosswordData> {
-  const gridSize = 20;
+  const gridSize = 30;
   const maxAttempts = 200;
 
   const WORD_POOL = await getWordPool();

@@ -18,6 +18,12 @@
 }
 
 @layer components {
+  .crossword-grid {
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
   .crossword-grid > * {
     aspect-ratio: 1;
     width: 60px;

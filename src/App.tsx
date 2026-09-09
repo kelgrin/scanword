@@ -18,6 +18,7 @@ import {
   Player,
 } from './services/multiplayerApi';
 import { Shuffle, Trophy, Lightbulb, Timer, Sun, Moon, Users } from 'lucide-react';
+import confetti from 'canvas-confetti';
 
 function App() {
   const [crossword, setCrossword] = useState<CrosswordData | null>(null);
@@ -332,6 +333,50 @@ function App() {
   };
 
   const isCompleted = totalWords > 0 && solvedCount === totalWords;
+
+  // Конфетти при завершении сканворда
+  useEffect(() => {
+    if (isCompleted && !showMultiplayer) {
+      // Запуск конфетти с левого края
+      confetti({
+        particleCount: 100,
+        angle: 60,
+        spread: 55,
+        origin: { x: 0, y: 0.5 },
+        colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff']
+      });
+
+      // Запуск конфетти с правого края
+      confetti({
+        particleCount: 100,
+        angle: 120,
+        spread: 55,
+        origin: { x: 1, y: 0.5 },
+        colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff']
+      });
+
+      // Дополнительные взрывы из центра
+      setTimeout(() => {
+        confetti({
+          particleCount: 150,
+          spread: 100,
+          origin: { x: 0.5, y: 0.5 },
+          colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff']
+        });
+      }, 250);
+
+      // Ещё один взрыв через 500мс
+      setTimeout(() => {
+        confetti({
+          particleCount: 100,
+          angle: 90,
+          spread: 100,
+          origin: { x: 0.5, y: 0.3 },
+          colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff']
+        });
+      }, 500);
+    }
+  }, [isCompleted, showMultiplayer]);
 
   // Show multiplayer page
   if (showMultiplayer) {
