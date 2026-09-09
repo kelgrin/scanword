@@ -152,7 +152,9 @@ function getClueDirectionVector(direction: ClueDirection): { dx: number; dy: num
 
 function getCluePosition(placed: PlacedWord): { x: number; y: number }[] {
   const clueVector = getClueDirectionVector(placed.clueDirection);
-  // Clue-клетка(и) стоят ПЕРЕД первой буквой (в обратном направлении от стрелки)
+  // Clue-клетка(и) стоят в обратном направлении от clueVector
+  // clueDirection указывает направление ОТ clue-клетки К первой букве слова
+  // Поэтому позиция clue-клетки = startX - clueVector.dx, startY - clueVector.dy
   const positions = [];
   for (let i = 0; i < placed.clueWidth; i++) {
     positions.push({
@@ -280,6 +282,7 @@ function findPossiblePlacements(
 ): { direction: WordDirection; clueDirection: ClueDirection; startX: number; startY: number; clueWidth: number; intersections: number }[] {
   const placements: { direction: WordDirection; clueDirection: ClueDirection; startX: number; startY: number; clueWidth: number; intersections: number }[] = [];
   const wordDirections: WordDirection[] = ['horizontal', 'vertical'];
+  const allClueDirections: ClueDirection[] = ['left', 'right', 'up', 'down', 'up-left', 'up-right', 'down-left', 'down-right'];
 
   // 1. Сначала ищем позиции с пересечениями (по общим буквам)
   for (const placed of placedWords) {
@@ -292,24 +295,24 @@ function findPossiblePlacements(
           for (const direction of wordDirections) {
             const vector = getWordDirectionVector(direction);
             
-            // clueDirection определяется автоматически на основе direction
-            const clueDirection: ClueDirection = direction === 'horizontal' ? 'left' : 'up';
-            
-            // Пробуем clueWidth 1 и 2
-            for (const clueWidth of [1, 2]) {
-              const startX = placed.startX + placedVector.dx * pi - vector.dx * ei;
-              const startY = placed.startY + placedVector.dy * pi - vector.dy * ei;
+            // Перебираем ВСЕ 8 направлений для clue-клетки
+            for (const clueDirection of allClueDirections) {
+              // Пробуем clueWidth 1 и 2
+              for (const clueWidth of [1, 2]) {
+                const startX = placed.startX + placedVector.dx * pi - vector.dx * ei;
+                const startY = placed.startY + placedVector.dy * pi - vector.dy * ei;
 
-              if (canPlaceWord(entry, direction, clueDirection, startX, startY, clueWidth, grid, placedWords, gridSize)) {
-                // Считаем количество пересечений
-                let intersections = 0;
-                for (let i = 0; i < entry.word.length; i++) {
-                  const x = startX + vector.dx * i;
-                  const y = startY + vector.dy * i;
-                  const cell = grid.get(`${x},${y}`);
-                  if (cell && cell.letter !== null) intersections++;
+                if (canPlaceWord(entry, direction, clueDirection, startX, startY, clueWidth, grid, placedWords, gridSize)) {
+                  // Считаем количество пересечений
+                  let intersections = 0;
+                  for (let i = 0; i < entry.word.length; i++) {
+                    const x = startX + vector.dx * i;
+                    const y = startY + vector.dy * i;
+                    const cell = grid.get(`${x},${y}`);
+                    if (cell && cell.letter !== null) intersections++;
+                  }
+                  placements.push({ direction, clueDirection, startX, startY, clueWidth, intersections });
                 }
-                placements.push({ direction, clueDirection, startX, startY, clueWidth, intersections });
               }
             }
           }
@@ -334,14 +337,15 @@ function findPossiblePlacements(
             if (offsetX === 0 && offsetY === 0) continue;
             
             for (const direction of wordDirections) {
-              const clueDirection: ClueDirection = direction === 'horizontal' ? 'left' : 'up';
-              
-              for (const clueWidth of [1, 2]) {
-                const startX = baseX + offsetX;
-                const startY = baseY + offsetY;
+              // Перебираем ВСЕ 8 направлений для clue-клетки
+              for (const clueDirection of allClueDirections) {
+                for (const clueWidth of [1, 2]) {
+                  const startX = baseX + offsetX;
+                  const startY = baseY + offsetY;
 
-                if (canPlaceWord(entry, direction, clueDirection, startX, startY, clueWidth, grid, placedWords, gridSize)) {
-                  placements.push({ direction, clueDirection, startX, startY, clueWidth, intersections: 0 });
+                  if (canPlaceWord(entry, direction, clueDirection, startX, startY, clueWidth, grid, placedWords, gridSize)) {
+                    placements.push({ direction, clueDirection, startX, startY, clueWidth, intersections: 0 });
+                  }
                 }
               }
             }
