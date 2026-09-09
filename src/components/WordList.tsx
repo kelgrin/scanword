@@ -13,18 +13,15 @@ const WordList: React.FC<WordListProps> = ({ words }) => {
   const setActiveWord = useCrosswordStore((s) => s.setActiveWord);
 
   const handleWordClick = (word: Word) => {
-    // Находим первую свободную клетку в этом слове
     const firstEmptyCellId = word.cells.find((cellId) => {
       const cell = cells.find((c) => c.id === cellId);
       return cell && cell.type === 'empty' && !cell.userInput;
     });
 
-    // Если есть свободная клетка, устанавливаем её как активную
     if (firstEmptyCellId) {
       setActiveWord(word.id);
       setActiveCell(firstEmptyCellId, word.id);
     } else {
-      // Если все клетки заполнены, устанавливаем первую клетку
       const firstCellId = word.cells[0];
       if (firstCellId) {
         setActiveWord(word.id);

@@ -10,7 +10,7 @@ interface ClueTooltipProps {
 }
 
 const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) => {
-  const [webInfo, setWebInfo] = useState<string | null>(null);
+  const [webInfo, setWebInfo] = useState<{ source: string; text: string }[]>([]);
   const [animeImage, setAnimeImage] = useState<string | null>(null);
   const [showAnimeMode, setShowAnimeMode] = useState(() => {
     return localStorage.getItem('showAnimeMode') === 'true';
@@ -20,16 +20,13 @@ const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) =>
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
 
-  // Загрузка anime картинки
   useEffect(() => {
     if (!showAnimeMode) return;
     
     const fetchAnimeImage = async () => {
       try {
-        // Добавляем timestamp для уникальности каждой картинки
         const timestamp = Date.now();
         
-        // Используем безопасные API для anime girl картинок
         const apis = [
           `https://api.waifu.pics/sfw/waifu?timestamp=${timestamp}`,
           `https://nekos.life/api/v2/img/neko?timestamp=${timestamp}`,
@@ -38,7 +35,6 @@ const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) =>
         
         for (const api of apis) {
           try {
-            // Добавляем таймаут для каждого запроса
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000);
             
@@ -63,12 +59,10 @@ const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) =>
               return;
             }
           } catch (error) {
-            // Игнорируем ошибки и пробуем следующий API
             continue;
           }
         }
         
-        // Если все API не сработали, используем placeholder
         console.warn('All anime image APIs failed, using placeholder');
       } catch (error) {
         console.error('Failed to fetch anime image:', error);
@@ -76,9 +70,8 @@ const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) =>
     };
 
     fetchAnimeImage();
-  }, [showAnimeMode, wordText]); // Добавили wordText в зависимости
+  }, [showAnimeMode, wordText]);
 
-  // Сохранение настройки
   useEffect(() => {
     localStorage.setItem('showAnimeMode', showAnimeMode.toString());
   }, [showAnimeMode]);
@@ -88,62 +81,128 @@ const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) =>
       if (!wordText || wordText.length < 2) return;
       
       setLoading(true);
-      try {
-        const query = wordText;
-        const response = await fetch(
-          `https://ru.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*&srlimit=1`
-        );
-        const data = await response.json();
+      
+      const results: { source: string; text: string }[] = [];
+      
+      const sources = [
+        {
+          name: 'Wikipedia',
+          fetch: async () => {
+            const query = wordText;
+            const response = await fetch(
+              `https://ru.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*&srlimit=1`
+            );
+            const data = await response.json();
+            
+            if (data.query?.search?.length > 0) {
+              const title = data.query.search[0].title;
+              const summaryResponse = await fetch(
+                `https://ru.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`
+              );
+              const summaryData = await summaryResponse.json();
+              
+              if (summaryData.extract) {
+                const sentences = summaryData.extract.match(/[^.!?]+[.!?]+/g) || [summaryData.extract];
+                return sentences.slice(0, 2).join(' ').trim();
+              }
+            }
+            return null;
+          }
+        },
         
-        if (data.query?.search?.length > 0) {
-          const title = data.query.search[0].title;
-          const summaryResponse = await fetch(
-            `https://ru.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`
-          );
-          const summaryData = await summaryResponse.json();
-          
-          if (summaryData.extract) {
-            // Улучшенная логика разделения предложений
-            // Разбиваем по точке, восклицательному или вопросительному знаку
-            const sentences = summaryData.extract.match(/[^.!?]+[.!?]+/g) || [summaryData.extract];
-            const firstFewSentences = sentences.slice(0, 3).join(' ').trim();
-            setWebInfo(firstFewSentences);
+        {
+          name: 'DuckDuckGo',
+          fetch: async () => {
+            const response = await fetch(
+              `https://api.duckduckgo.com/?q=${encodeURIComponent(wordText)}&format=json&no_html=1&skip_disambig=1`
+            );
+            const data = await response.json();
+            
+            if (data.AbstractText) {
+              const sentences = data.AbstractText.match(/[^.!?]+[.!?]+/g) || [data.AbstractText];
+              return sentences.slice(0, 2).join(' ').trim();
+            }
+            return null;
+          }
+        },
+        
+        {
+          name: 'Dictionary',
+          fetch: async () => {
+            const response = await fetch(
+              `https://api.dictionaryapi.dev/api/v2/entries/ru/${encodeURIComponent(wordText.toLowerCase())}`
+            );
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data && data.length > 0 && data[0].meanings && data[0].meanings.length > 0) {
+                const definitions = data[0].meanings[0].definitions;
+                if (definitions && definitions.length > 0) {
+                  return definitions[0].definition;
+                }
+              }
+            }
+            return null;
           }
         }
-      } catch (error) {
-        console.error('Failed to fetch web info:', error);
-        setWebInfo(null);
-      } finally {
+      ];
+      
+      const firstTwoSources = sources.slice(0, 2);
+      const promises = firstTwoSources.map(async (source) => {
+        try {
+          const text = await source.fetch();
+          if (text) {
+            results.push({ source: source.name, text });
+          }
+        } catch (error) {
+          console.warn(`${source.name} failed:`, error);
+        }
+      });
+      
+      await Promise.all(promises);
+      
+      if (results.length > 0) {
+        setWebInfo(results);
         setLoading(false);
+        return;
       }
+      
+      try {
+        const backupText = await sources[2].fetch();
+        if (backupText) {
+          setWebInfo([{ source: sources[2].name, text: backupText }]);
+        } else {
+          setWebInfo([]);
+        }
+      } catch (error) {
+        console.warn('Backup source failed:', error);
+        setWebInfo([]);
+      }
+      
+      setLoading(false);
     };
 
     fetchWebInfo();
   }, [wordText]);
 
-  // Calculate position on mount
   useEffect(() => {
-    // Find the parent cell element
     const parentCell = tooltipRef.current?.parentElement;
     if (parentCell) {
       const cellRect = parentCell.getBoundingClientRect();
       const tooltipWidth = 260;
-      const tooltipHeight = 150; // approximate
+      const tooltipHeight = 150;
       
       let top = cellRect.top - tooltipHeight - 12;
       let left = cellRect.left + cellRect.width / 2 - tooltipWidth / 2;
       
-      // If tooltip goes above viewport, show below
       if (top < 8) {
         top = cellRect.bottom + 12;
       }
       
-      // If tooltip goes beyond right edge
       if (left + tooltipWidth > window.innerWidth - 8) {
         left = window.innerWidth - tooltipWidth - 8;
       }
       
-      // If tooltip goes beyond left edge
       if (left < 8) {
         left = 8;
       }
@@ -210,7 +269,6 @@ const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) =>
           )}
           
           {showAnimeMode ? (
-            // Anime режим
             <div className="border-t border-gray-100 dark:border-gray-700 pt-2 mt-2">
               {animeImage ? (
                 <div 
@@ -238,7 +296,6 @@ const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) =>
               )}
             </div>
           ) : (
-            // Wikipedia режим
             <>
               {loading && (
                 <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
@@ -247,19 +304,23 @@ const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) =>
                 </div>
               )}
               
-              {webInfo && !loading && (
+              {webInfo.length > 0 && !loading && (
                 <div className="border-t border-gray-100 dark:border-gray-700 pt-2 mt-2">
-                  <div className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 mb-1">
-                    <Globe size={10} />
-                    <span className="font-medium">Из Википедии:</span>
-                  </div>
-                  <div className="max-h-32 overflow-y-auto">
-                    <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">{webInfo}</p>
+                  <div className="max-h-40 overflow-y-auto space-y-2">
+                    {webInfo.map((info, index) => (
+                      <div key={index}>
+                        <div className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 mb-1">
+                          <Globe size={10} />
+                          <span className="font-medium">{info.source}:</span>
+                        </div>
+                        <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">{info.text}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
               
-              {!webInfo && !loading && wordText && (
+              {webInfo.length === 0 && !loading && wordText && (
                 <div className="border-t border-gray-100 dark:border-gray-700 pt-2 mt-2">
                   <p className="text-xs text-gray-400 dark:text-gray-500 italic">Информация недоступна</p>
                 </div>
@@ -268,8 +329,6 @@ const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) =>
           )}
         </div>
       </div>
-      
-      {/* Arrow */}
       {!isExpanded && (
         <div
           className="absolute left-1/2 -translate-x-1/2 -bottom-2 w-0 h-0"

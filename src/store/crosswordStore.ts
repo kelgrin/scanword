@@ -8,9 +8,8 @@ interface CrosswordState {
   activeCellId: string | null;
   activeWordId: string | null;
   hints: number;
-  hintCells: Set<string>; // Cells revealed by hints
+  hintCells: Set<string>;
 
-  // Actions
   loadCrossword: (data: CrosswordData) => void;
   reset: () => void;
   setActiveCell: (cellId: string | null, wordId?: string) => void;
@@ -76,7 +75,6 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
     const cell = state.cells.find((c) => c.id === cellId);
     if (!cell) return;
 
-    // If wordId is provided, use it. Otherwise, find which word this cell belongs to
     let resolvedWordId = wordId ?? null;
     if (!resolvedWordId) {
       const word = state.words.find((w) => w.cells.includes(cellId));
@@ -106,7 +104,6 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
           : cell
       ),
     }));
-    // Check words after input
     setTimeout(() => get().checkWords(), 0);
   },
 
@@ -121,7 +118,7 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
   checkWords: () => {
     const state = get();
     const updatedWords = state.words.map((word) => {
-      if (word.isSolved) return word; // already solved
+      if (word.isSolved) return word;
 
       const wordCells = word.cells.map((cid) => state.cells.find((c) => c.id === cid));
       const allFilled = wordCells.every((c) => c && c.userInput !== '');
@@ -158,7 +155,6 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
 
   isCellSolved: (cellId: string) => {
     const state = get();
-    // Cell is solved if it's part of a solved word OR if it was revealed by a hint
     return state.words.some((w) => w.isSolved && w.cells.includes(cellId)) || state.hintCells.has(cellId);
   },
 
@@ -171,11 +167,9 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
 
   getSolvedWordForCell: (cellId: string) => {
     const state = get();
-    // Find solved word that contains this cell
     const solvedWord = state.words.find((w) => w.isSolved && w.cells.includes(cellId));
     if (!solvedWord) return null;
     
-    // Get the word text from cells
     const wordText = solvedWord.cells
       .map((cid) => state.cells.find((c) => c.id === cid)?.userInput || '')
       .join('');
@@ -200,32 +194,8 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
     const word = state.words.find((w) => w.id === wordId);
     if (!word) return null;
     const idx = word.cells.indexOf(cellId);
-    if (idx === -1) return null;
-    
-    // Determine word direction to know what "next" means
-    const firstCellId = word.cells[0];
-    const lastCellId = word.cells[word.cells.length - 1];
-    const firstCell = state.cells.find((c) => c.id === firstCellId);
-    const lastCell = state.cells.find((c) => c.id === lastCellId);
-    
-    if (!firstCell || !lastCell) return idx < word.cells.length - 1 ? word.cells[idx + 1] : null;
-    
-    // If word goes right or down, next is idx + 1
-    // If word goes left or up, next is idx - 1
-    const isHorizontal = firstCell.y === lastCell.y;
-    const isReverse = isHorizontal 
-      ? firstCell.x > lastCell.x  // going left
-      : firstCell.y > lastCell.y; // going up
-    
-    if (isReverse) {
-      // Word goes left or up, so "next" in reading order is idx - 1
-      if (idx <= 0) return null;
-      return word.cells[idx - 1];
-    } else {
-      // Word goes right or down, so "next" in reading order is idx + 1
-      if (idx >= word.cells.length - 1) return null;
-      return word.cells[idx + 1];
-    }
+    if (idx === -1 || idx >= word.cells.length - 1) return null;
+    return word.cells[idx + 1];
   },
 
   getPrevCellInWord: (cellId: string, wordId: string) => {
@@ -234,31 +204,7 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
     if (!word) return null;
     const idx = word.cells.indexOf(cellId);
     if (idx <= 0) return null;
-    
-    // Determine word direction to know what "previous" means
-    const firstCellId = word.cells[0];
-    const lastCellId = word.cells[word.cells.length - 1];
-    const firstCell = state.cells.find((c) => c.id === firstCellId);
-    const lastCell = state.cells.find((c) => c.id === lastCellId);
-    
-    if (!firstCell || !lastCell) return word.cells[idx - 1];
-    
-    // If word goes right or down, previous is idx - 1
-    // If word goes left or up, previous is idx + 1
-    const isHorizontal = firstCell.y === lastCell.y;
-    const isReverse = isHorizontal 
-      ? firstCell.x > lastCell.x  // going left
-      : firstCell.y > lastCell.y; // going up
-    
-    if (isReverse) {
-      // Word goes left or up, so "previous" in reading order is idx + 1
-      if (idx >= word.cells.length - 1) return null;
-      return word.cells[idx + 1];
-    } else {
-      // Word goes right or down, so "previous" in reading order is idx - 1
-      if (idx <= 0) return null;
-      return word.cells[idx - 1];
-    }
+    return word.cells[idx - 1];
   },
 
   getNextEmptyCellInWord: (cellId: string, wordId: string) => {
@@ -268,37 +214,11 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
     const idx = word.cells.indexOf(cellId);
     if (idx === -1) return null;
     
-    // Determine word direction
-    const firstCellId = word.cells[0];
-    const lastCellId = word.cells[word.cells.length - 1];
-    const firstCell = state.cells.find((c) => c.id === firstCellId);
-    const lastCell = state.cells.find((c) => c.id === lastCellId);
-    
-    if (!firstCell || !lastCell) return null;
-    
-    const isHorizontal = firstCell.y === lastCell.y;
-    const isReverse = isHorizontal 
-      ? firstCell.x > lastCell.x
-      : firstCell.y > lastCell.y;
-    
-    // Search in the correct direction
-    if (isReverse) {
-      // Word goes left or up, search backwards (idx - 1, idx - 2, ...)
-      for (let i = idx - 1; i >= 0; i--) {
-        const nextCellId = word.cells[i];
-        const nextCell = state.cells.find((c) => c.id === nextCellId);
-        if (nextCell && nextCell.type === 'empty' && nextCell.userInput === '') {
-          return nextCellId;
-        }
-      }
-    } else {
-      // Word goes right or down, search forwards (idx + 1, idx + 2, ...)
-      for (let i = idx + 1; i < word.cells.length; i++) {
-        const nextCellId = word.cells[i];
-        const nextCell = state.cells.find((c) => c.id === nextCellId);
-        if (nextCell && nextCell.type === 'empty' && nextCell.userInput === '') {
-          return nextCellId;
-        }
+    for (let i = idx + 1; i < word.cells.length; i++) {
+      const nextCellId = word.cells[i];
+      const nextCell = state.cells.find((c) => c.id === nextCellId);
+      if (nextCell && nextCell.type === 'empty' && nextCell.userInput === '') {
+        return nextCellId;
       }
     }
     return null;
@@ -309,39 +229,13 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
     const word = state.words.find((w) => w.id === wordId);
     if (!word) return null;
     const idx = word.cells.indexOf(cellId);
-    if (idx === -1) return null;
+    if (idx <= 0) return null;
     
-    // Determine word direction
-    const firstCellId = word.cells[0];
-    const lastCellId = word.cells[word.cells.length - 1];
-    const firstCell = state.cells.find((c) => c.id === firstCellId);
-    const lastCell = state.cells.find((c) => c.id === lastCellId);
-    
-    if (!firstCell || !lastCell) return null;
-    
-    const isHorizontal = firstCell.y === lastCell.y;
-    const isReverse = isHorizontal 
-      ? firstCell.x > lastCell.x
-      : firstCell.y > lastCell.y;
-    
-    // Search in the reverse direction of reading
-    if (isReverse) {
-      // Word goes left or up, so "previous" is idx + 1, idx + 2, ...
-      for (let i = idx + 1; i < word.cells.length; i++) {
-        const prevCellId = word.cells[i];
-        const prevCell = state.cells.find((c) => c.id === prevCellId);
-        if (prevCell && prevCell.type === 'empty' && prevCell.userInput === '') {
-          return prevCellId;
-        }
-      }
-    } else {
-      // Word goes right or down, so "previous" is idx - 1, idx - 2, ...
-      for (let i = idx - 1; i >= 0; i--) {
-        const prevCellId = word.cells[i];
-        const prevCell = state.cells.find((c) => c.id === prevCellId);
-        if (prevCell && prevCell.type === 'empty' && prevCell.userInput === '') {
-          return prevCellId;
-        }
+    for (let i = idx - 1; i >= 0; i--) {
+      const prevCellId = word.cells[i];
+      const prevCell = state.cells.find((c) => c.id === prevCellId);
+      if (prevCell && prevCell.type === 'empty' && prevCell.userInput === '') {
+        return prevCellId;
       }
     }
     return null;
@@ -354,10 +248,8 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
     const cell = state.cells.find((c) => c.id === cellId);
     if (!cell || !cell.answerLetter) return false;
     
-    // Don't use hint on already solved cells
     if (state.hintCells.has(cellId)) return false;
     
-    // Set the correct letter and mark as hint cell
     set((state) => {
       const newHintCells = new Set(state.hintCells);
       newHintCells.add(cellId);
@@ -371,7 +263,6 @@ export const useCrosswordStore = create<CrosswordState>((set, get) => ({
       };
     });
     
-    // Check words after hint
     setTimeout(() => get().checkWords(), 0);
     return true;
   },

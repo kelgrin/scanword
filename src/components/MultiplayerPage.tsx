@@ -32,7 +32,6 @@ const MultiplayerPage: React.FC<MultiplayerPageProps> = ({ onBack, onRoomCreated
     setError('');
 
     try {
-      // Генерируем новый сканворд для мультиплеера
       const { crosswordApi } = await import('../services/crosswordApi');
       const crosswordData = await crosswordApi.generateNew();
       
@@ -42,7 +41,6 @@ const MultiplayerPage: React.FC<MultiplayerPageProps> = ({ onBack, onRoomCreated
       setCreatedPlayerId(playerId);
       setCreatedCrosswordData(crosswordData);
       
-      // Загружаем кроссворд в store
       useCrosswordStore.getState().loadCrossword(crosswordData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка создания комнаты');
@@ -67,7 +65,6 @@ const MultiplayerPage: React.FC<MultiplayerPageProps> = ({ onBack, onRoomCreated
     try {
       const { roomId, playerId, crosswordData, creatorId } = await joinRoom(roomCode.trim(), playerName.trim());
       
-      // Загружаем кроссворд в store
       useCrosswordStore.getState().loadCrossword(crosswordData);
       
       onRoomJoined(roomId, playerId, crosswordData, creatorId);
@@ -170,7 +167,7 @@ const MultiplayerPage: React.FC<MultiplayerPageProps> = ({ onBack, onRoomCreated
               </button>
 
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                Отправьте код другу и дождитесь его присоединения
+                Ожидание второго игрока...
               </p>
 
               <button

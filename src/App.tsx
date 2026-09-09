@@ -7,6 +7,8 @@ import WordList from './components/WordList';
 import DraggableGrid from './components/DraggableGrid';
 import MultiplayerPage from './components/MultiplayerPage';
 import Chat from './components/Chat';
+import AuthModal from './components/AuthModal';
+import ProfileModal from './components/ProfileModal';
 import {
   subscribeToGameState,
   subscribeToPlayers,
@@ -17,7 +19,16 @@ import {
   deleteLetter,
   Player,
 } from './services/multiplayerApi';
-import { Shuffle, Trophy, Lightbulb, Timer, Sun, Moon, Users } from 'lucide-react';
+import {
+  getCurrentUser,
+  onAuthStateChange,
+  saveProgress,
+  getSettings,
+  getStats,
+  updateStatsOnCompletion,
+} from './services/userService';
+import { Shuffle, Trophy, Lightbulb, Timer, Sun, Moon, Users, LogIn, LogOut, Settings } from 'lucide-react';
+import confetti from 'canvas-confetti';
 
 function App() {
   const [crossword, setCrossword] = useState<CrosswordData | null>(null);
@@ -40,6 +51,13 @@ function App() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [myColor, setMyColor] = useState<string>('#3B82F6');
   
+  // Auth state
+  const [user, setUser] = useState<any>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [userStats, setUserStats] = useState<any>(null);
+  const [wordsPerCrossword, setWordsPerCrossword] = useState(25);
+  
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const solvedCount = useCrosswordStore((state) => state.getSolvedCount());
   const totalWords = useCrosswordStore((state) => state.words.length);
@@ -50,7 +68,42 @@ function App() {
   const cells = useCrosswordStore((state) => state.cells);
 
   useEffect(() => {
-    loadCrossword();
+    // Load user settings first, then load crossword
+    const initialize = async () => {
+      try {
+        const settings = await getSettings();
+        if (settings) {
+          setWordsPerCrossword(settings.words_per_crossword);
+        }
+      } catch (err) {
+        console.error('Failed to load settings:', err);
+      }
+      
+      // Load crossword after settings are loaded
+      loadCrossword();
+    };
+    
+    initialize();
+  }, []);
+
+  // Auth state listener
+  useEffect(() => {
+    const { data: authListener } = onAuthStateChange((user) => {
+      setUser(user);
+      if (user) {
+        // Load user stats when logged in
+        getStats().then(setUserStats);
+      } else {
+        setUserStats(null);
+      }
+    });
+
+    // Check initial auth state
+    getCurrentUser().then(setUser);
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   // Theme logic
@@ -173,6 +226,34 @@ function App() {
     };
   }, [isMultiplayer, roomId, playerId, myColor]);
 
+  const isCompleted = totalWords > 0 && solvedCount === totalWords;
+
+  // Сохранение прогресса при изменениях
+  useEffect(() => {
+    if (!user || !crossword || isMultiplayer) return;
+
+    const saveTimeout = setTimeout(async () => {
+      try {
+        const cells = useCrosswordStore.getState().cells;
+        const words = useCrosswordStore.getState().words;
+        const solvedWords = words.filter(w => w.isSolved).map(w => parseInt(w.id.replace('w', '')));
+        
+        await saveProgress(
+          crossword.id,
+          crossword,
+          cells,
+          solvedWords,
+          elapsedSeconds,
+          isCompleted
+        );
+      } catch (err) {
+        console.error('Failed to save progress:', err);
+      }
+    }, 2000); // Сохраняем через 2 секунды после изменений
+
+    return () => clearTimeout(saveTimeout);
+  }, [user, crossword, cells, elapsedSeconds, isCompleted, isMultiplayer]);
+
   // Автоматическая синхронизация каждые 1 секунду
   useEffect(() => {
     if (!isMultiplayer || !roomId) return;
@@ -189,19 +270,10 @@ function App() {
         // Добавляем/обновляем буквы из БД
         letters.forEach((letter) => {
           const currentCell = currentCells.find(c => c.id === letter.cell_id);
-          
-          // Обновляем только если:
-          // 1. Локальной буквы нет, или
-          // 2. Локальная буква от другого игрока, или
-          // 3. Локальная буква от текущего игрока, но отличается от серверной (значит другой игрок её изменил)
-          if (!currentCell || !currentCell.userInput) {
-            // Клетка пуста локально - добавляем из БД
-            useCrosswordStore.getState().setInput(letter.cell_id, letter.letter, letter.player_color, letter.player_id);
-          } else if (currentCell.playerId !== playerId && currentCell.userInput !== letter.letter) {
-            // Буква от другого игрока и отличается - обновляем
+          // Обновляем только если буква отличается
+          if (currentCell && currentCell.userInput !== letter.letter) {
             useCrosswordStore.getState().setInput(letter.cell_id, letter.letter, letter.player_color, letter.player_id);
           }
-          // Если буква от текущего игрока - не трогаем (избегаем лагов)
         });
         
         // Удаляем буквы, которых нет в БД (были удалены другим игроком)
@@ -237,7 +309,7 @@ function App() {
   const loadCrossword = async () => {
     setLoading(true);
     setElapsedSeconds(0);
-    const data = await crosswordApi.fetchCrossword('crossword-1');
+    const data = await crosswordApi.fetchCrossword('crossword-1', wordsPerCrossword);
     setCrossword(data);
     useCrosswordStore.getState().loadCrossword(data);
     setLoading(false);
@@ -253,7 +325,7 @@ function App() {
     setLoading(true);
     setElapsedSeconds(0);
     resetStore();
-    const data = await crosswordApi.generateNew();
+    const data = await crosswordApi.generateNew(wordsPerCrossword);
     
     // В мультиплеере обновляем кроссворд в комнате
     if (isMultiplayer && roomId && playerId) {
@@ -320,6 +392,7 @@ function App() {
     setIsMultiplayer(false);
     setRoomId(null);
     setPlayerId(null);
+    setCreatorId(null);
     setPlayers([]);
   };
 
@@ -339,7 +412,49 @@ function App() {
     setPlayers(playersList);
   };
 
-  const isCompleted = totalWords > 0 && solvedCount === totalWords;
+  // Конфетти при завершении сканворда
+  useEffect(() => {
+    if (isCompleted && !showMultiplayer) {
+      // Запуск конфетти с левого края
+      confetti({
+        particleCount: 100,
+        angle: 60,
+        spread: 55,
+        origin: { x: 0, y: 0.5 },
+        colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff']
+      });
+
+      // Запуск конфетти с правого края
+      confetti({
+        particleCount: 100,
+        angle: 120,
+        spread: 55,
+        origin: { x: 1, y: 0.5 },
+        colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff']
+      });
+
+      // Дополнительные взрывы из центра
+      setTimeout(() => {
+        confetti({
+          particleCount: 150,
+          spread: 100,
+          origin: { x: 0.5, y: 0.5 },
+          colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff']
+        });
+      }, 250);
+
+      // Ещё один взрыв через 500мс
+      setTimeout(() => {
+        confetti({
+          particleCount: 100,
+          angle: 90,
+          spread: 100,
+          origin: { x: 0.5, y: 0.3 },
+          colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff']
+        });
+      }, 500);
+    }
+  }, [isCompleted, showMultiplayer]);
 
   // Show multiplayer page
   if (showMultiplayer) {
@@ -412,6 +527,41 @@ function App() {
                 <Moon className="w-4 h-4 text-gray-600" />
               )}
             </button>
+
+            {/* Settings button */}
+            {user && (
+              <button
+                onClick={() => setShowSettingsModal(true)}
+                className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                title="Настройки"
+              >
+                <Settings className="w-4 h-4 text-gray-600 dark:text-gray-300" />
+              </button>
+            )}
+
+            {/* Auth button */}
+            {user ? (
+              <button
+                onClick={async () => {
+                  const { signOut } = await import('./services/userService');
+                  await signOut();
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-red-500 to-orange-600 text-white rounded-lg hover:from-red-600 hover:to-orange-700 transition-all shadow-md hover:shadow-lg active:scale-95"
+                title="Выйти"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline text-sm">Выйти</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className="flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-lg hover:from-green-600 hover:to-teal-700 transition-all shadow-md hover:shadow-lg active:scale-95"
+                title="Войти"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline text-sm">Войти</span>
+              </button>
+            )}
 
             {/* Hint button */}
             <button
@@ -561,6 +711,42 @@ function App() {
       {isMultiplayer && roomId && playerId && (
         <Chat roomId={roomId} playerId={playerId} playerName={playerName} />
       )}
+
+      {/* Auth modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={() => {
+          // Reload stats after login
+          getStats().then(setUserStats);
+        }}
+      />
+
+      {/* Profile modal */}
+      <ProfileModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        onSettingsChange={(wordsCount) => {
+          setWordsPerCrossword(wordsCount);
+        }}
+        onLoadProgress={async (crosswordId) => {
+          // Load saved progress
+          const { loadProgress } = await import('./services/userService');
+          const progress = await loadProgress(crosswordId);
+          if (progress) {
+            const data = progress.crossword_data;
+            setCrossword(data);
+            useCrosswordStore.getState().loadCrossword(data);
+            
+            // Restore cells state
+            progress.cells_state && Object.entries(progress.cells_state).forEach(([cellId, letter]) => {
+              useCrosswordStore.getState().setInput(cellId, letter as string);
+            });
+            
+            setElapsedSeconds(progress.time_spent || 0);
+          }
+        }}
+      />
     </div>
   );
 }

@@ -23,7 +23,6 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
     const words = useCrosswordStore((s) => s.words);
     const getSolvedWordForCell = useCrosswordStore((s) => s.getSolvedWordForCell);
 
-    // Close tooltip when clicking outside
     useEffect(() => {
       if (!showTooltip) return;
       const handleClickOutside = (e: MouseEvent) => {
@@ -35,7 +34,6 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [showTooltip]);
 
-    // Hover tooltip for clue cells
     const handleMouseEnter = () => {
       if (cell.type === 'clue' && cell.clueText) {
         hoverTimeoutRef.current = setTimeout(() => {
@@ -66,8 +64,6 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
         if (targetWord?.isSolved) {
           setShowTooltip(!showTooltip);
         } else {
-          // Focus first EMPTY cell of target word
-          // Pass the clue cell ID, CrosswordGrid will find the correct target
           onFocus(cell.id);
         }
       }
@@ -75,7 +71,6 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
 
     const handleEmptyCellClick = () => {
       if (isSolved) {
-        // Show tooltip for solved words
         setShowTooltip(!showTooltip);
       } else {
         onFocus(cell.id);
@@ -101,14 +96,6 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
           return <ArrowLeft size={iconSize} className="text-gray-600 dark:text-gray-300" strokeWidth={2.5} />;
         case 'up':
           return <ArrowUp size={iconSize} className="text-gray-600 dark:text-gray-300" strokeWidth={2.5} />;
-        case 'up-right':
-          return <ArrowUp size={iconSize} className="text-gray-600 dark:text-gray-300 rotate-45" strokeWidth={2.5} />;
-        case 'up-left':
-          return <ArrowUp size={iconSize} className="text-gray-600 dark:text-gray-300 -rotate-45" strokeWidth={2.5} />;
-        case 'down-right':
-          return <ArrowDown size={iconSize} className="text-gray-600 dark:text-gray-300 -rotate-45" strokeWidth={2.5} />;
-        case 'down-left':
-          return <ArrowDown size={iconSize} className="text-gray-600 dark:text-gray-300 rotate-45" strokeWidth={2.5} />;
         default:
           return null;
       }
@@ -159,7 +146,6 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
               y={cell.y}
             />
           )}
-          {/* Hover tooltip with full clue text */}
           {showHoverTooltip && !showTooltip && cell.clueText && (
             <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded-lg shadow-lg whitespace-nowrap max-w-xs">
               <div className="font-medium">{cell.clueText}</div>
@@ -170,8 +156,6 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
       );
     }
 
-    // Empty cell with input
-    // FIX bug #4: use getSolvedWordForCell to find the correct solved word
     const solvedWordInfo = isSolved ? getSolvedWordForCell(cell.id) : null;
 
     return (
@@ -201,7 +185,7 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
           readOnly={isSolved}
           tabIndex={isSolved ? -1 : 0}
           maxLength={2}
-          className={`w-full h-full text-center text-base font-bold bg-transparent outline-none uppercase cursor-pointer
+          className={`w-full h-full text-center text-xl font-bold bg-transparent outline-none uppercase cursor-pointer
             ${isSolved ? 'text-green-700 dark:text-green-400' : ''}
           `}
           style={{

@@ -1,5 +1,5 @@
 export type CellType = 'black' | 'empty' | 'clue';
-export type Direction = 'up' | 'down' | 'left' | 'right' | 'up-left' | 'up-right' | 'down-left' | 'down-right';
+export type Direction = 'up' | 'down' | 'left' | 'right';
 
 export interface Cell {
   id: string;
@@ -17,7 +17,7 @@ export interface Cell {
 
 export interface Word {
   id: string;
-  cells: string[]; // array of cell ids
+  cells: string[];
   clueText: string;
   isSolved: boolean;
 }

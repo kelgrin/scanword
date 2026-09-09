@@ -18,10 +18,21 @@
 }
 
 @layer components {
+  .crossword-grid {
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    display: grid;
+    gap: 2px;
+    width: fit-content;
+    height: fit-content;
+  }
+
   .crossword-grid > * {
     aspect-ratio: 1;
     width: 60px;
     height: 60px;
+    box-sizing: border-box;
   }
 
   @media (max-width: 1024px) {

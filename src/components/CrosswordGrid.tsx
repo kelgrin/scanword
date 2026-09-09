@@ -35,10 +35,8 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword, playerColor, p
     }
   }, []);
 
-  // Focus active cell
   useEffect(() => {
     if (activeCellId) {
-      // Use requestAnimationFrame to ensure DOM is updated
       requestAnimationFrame(() => {
         const input = inputRefs.current.get(activeCellId);
         if (input) {
@@ -47,7 +45,6 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword, playerColor, p
             input.select();
             input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
           } else {
-            // If cell is readOnly (solved), try to find next non-solved cell in active word
             const currentActiveWordId = useCrosswordStore.getState().activeWordId;
             if (currentActiveWordId) {
               const word = words.find((w) => w.id === currentActiveWordId);
@@ -64,7 +61,6 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword, playerColor, p
     }
   }, [activeCellId, words, isCellSolved, setActiveCell]);
 
-  // Handle clue cell click - focus first EMPTY letter of target word
   const handleCellFocus = useCallback(
     (cellId: string) => {
       const cell = cells.find((c) => c.id === cellId);
@@ -73,20 +69,16 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword, playerColor, p
       if (cell.type === 'clue' && cell.targetWordId) {
         const word = words.find((w) => w.id === cell.targetWordId);
         if (word && word.cells.length > 0) {
-          // Find first EMPTY and NOT SOLVED cell in the word
           const firstEmptyCellId = word.cells.find((cid) => {
             const c = cells.find((cc) => cc.id === cid);
-            return c && c.type === 'empty' && c.userInput === '' && !useCrosswordStore.getState().isCellSolved(cid);
+            return c && c.type === 'empty' && !c.userInput && !useCrosswordStore.getState().isCellSolved(cid);
           });
-          
-          // If all cells are filled, find first non-solved cell
+
           const targetCellId = firstEmptyCellId || word.cells.find((cid) => !useCrosswordStore.getState().isCellSolved(cid)) || word.cells[0];
           setActiveWord(word.id);
           setActiveCell(targetCellId, word.id);
         }
       } else if (cell.type === 'empty') {
-        // Find which word this cell belongs to
-        // If cell is on intersection, prefer the currently active word if it contains this cell
         const currentWordId = useCrosswordStore.getState().activeWordId;
         const currentWord = currentWordId ? words.find((w) => w.id === currentWordId) : null;
         
@@ -103,23 +95,19 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword, playerColor, p
     [cells, words, setActiveCell, setActiveWord]
   );
 
-  // Handle input
   const handleInput = useCallback(
     (cellId: string, value: string) => {
       if (!value) return;
       const letter = value.toUpperCase().slice(-1);
       if (!/[А-ЯЁA-Z]/.test(letter)) return;
 
-      // Check if cell already has a letter from another player
       const cell = cells.find((c) => c.id === cellId);
       if (cell && cell.userInput && playerId && cell.playerId && cell.playerId !== playerId) {
-        // Cell has a letter from another player - cannot overwrite
         return;
       }
 
       setInput(cellId, letter, playerColor, playerId);
 
-      // Auto-advance to next EMPTY cell — skip filled cells
       const currentActiveWordId = useCrosswordStore.getState().activeWordId;
       if (currentActiveWordId) {
         const nextEmptyCellId = getNextEmptyCellInWord(cellId, currentActiveWordId);
@@ -133,7 +121,6 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword, playerColor, p
     [setInput, getNextEmptyCellInWord, setActiveCell, playerColor, playerId, cells]
   );
 
-  // Handle keyboard events
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent, cellId: string) => {
       const currentActiveWordId = useCrosswordStore.getState().activeWordId;
@@ -143,15 +130,12 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword, playerColor, p
         const cell = cells.find((c) => c.id === cellId);
         if (!cell) return;
 
-        // Don't allow deletion from solved cells
         if (isCellSolved(cellId)) {
           return;
         }
 
         if (cell.userInput !== '') {
-          // Check if this letter belongs to the current player
           if (playerId && cell.playerId && cell.playerId !== playerId) {
-            // Letter belongs to another player - cannot delete, just move to previous cell
             if (currentActiveWordId) {
               let prevCellId = getPrevCellInWord(cellId, currentActiveWordId);
               while (prevCellId && isCellSolved(prevCellId)) {
@@ -163,13 +147,10 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword, playerColor, p
             }
             return;
           }
-          // Cell has content and belongs to current player — clear it
           clearInput(cellId);
         } else if (currentActiveWordId) {
-          // Cell is empty — find previous non-solved cell in word
           let prevCellId = getPrevCellInWord(cellId, currentActiveWordId);
           
-          // Skip over solved cells
           while (prevCellId && isCellSolved(prevCellId)) {
             prevCellId = getPrevCellInWord(prevCellId, currentActiveWordId);
           }
@@ -177,9 +158,7 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword, playerColor, p
           if (prevCellId) {
             const prevCell = cells.find((c) => c.id === prevCellId);
             if (prevCell && prevCell.userInput !== '') {
-              // Check if previous cell belongs to current player
               if (playerId && prevCell.playerId && prevCell.playerId !== playerId) {
-                // Previous cell belongs to another player - skip it and continue searching
                 let skipCellId = getPrevCellInWord(prevCellId, currentActiveWordId);
                 while (skipCellId && isCellSolved(skipCellId)) {
                   skipCellId = getPrevCellInWord(skipCellId, currentActiveWordId);
@@ -188,12 +167,10 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword, playerColor, p
                   setActiveCell(skipCellId, currentActiveWordId);
                 }
               } else {
-                // Previous cell has content and belongs to current player — clear it and move to it
                 clearInput(prevCellId);
                 setActiveCell(prevCellId, currentActiveWordId);
               }
             } else {
-              // Previous cell is also empty — just move to it
               setActiveCell(prevCellId, currentActiveWordId);
             }
           }
@@ -216,7 +193,6 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword, playerColor, p
           case 'ArrowUp': targetY -= 1; break;
         }
 
-        // Find nearest empty cell in that direction
         const targetCell = cells.find(
           (c) => c.x === targetX && c.y === targetY && c.type === 'empty'
         );
@@ -229,7 +205,6 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword, playerColor, p
 
       if (e.key === 'Tab') {
         e.preventDefault();
-        // Move to next word
         const currentIdx = words.findIndex((w) => w.id === currentActiveWordId);
         const nextIdx = e.shiftKey
           ? (currentIdx - 1 + words.length) % words.length
@@ -241,15 +216,15 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword, playerColor, p
         }
       }
     },
-    [cells, words, setActiveCell, setActiveWord, clearInput, getPrevEmptyCellInWord]
+    [cells, words, setActiveCell, setActiveWord, clearInput, getPrevCellInWord, playerId]
   );
 
   return (
     <div
       className="crossword-grid inline-grid gap-[2px] bg-gray-300 dark:bg-gray-700 p-[2px] rounded-lg shadow-inner transition-colors"
       style={{
-        gridTemplateColumns: `repeat(${crossword.width}, 1fr)`,
-        gridTemplateRows: `repeat(${crossword.height}, 1fr)`,
+        gridTemplateColumns: `repeat(${crossword.width}, 60px)`,
+        gridTemplateRows: `repeat(${crossword.height}, 60px)`,
       }}
     >
       {cells.map((cell) => (

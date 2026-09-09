@@ -22,18 +22,14 @@ const Chat: React.FC<ChatProps> = ({ roomId, playerId, playerName }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Загружаем историю сообщений
     getChatMessages(roomId).then((msgs) => {
       setMessages(msgs);
       setIsConnected(true);
     });
 
-    // Подписываемся на новые сообщения
     const subscription = subscribeToChat(roomId, (payload) => {
       setMessages((prev) => {
-        // Avoid duplicates
         if (prev.some(m => m.id === payload.new.id)) return prev;
-        // Если чат закрыт и сообщение не от нас - увеличиваем счетчик непрочитанных
         if (!isOpen && payload.new.player_id !== playerId) {
           setUnreadCount(c => c + 1);
         }
@@ -47,16 +43,13 @@ const Chat: React.FC<ChatProps> = ({ roomId, playerId, playerName }) => {
     };
   }, [roomId, isOpen, playerId]);
 
-  // Автоматическая синхронизация сообщений каждые 2 секунды
   useEffect(() => {
     const syncInterval = setInterval(async () => {
       try {
         const msgs = await getChatMessages(roomId);
         setMessages((prev) => {
-          // Находим новые сообщения
           const newMsgs = msgs.filter(m => !prev.some(pm => pm.id === m.id));
           if (newMsgs.length > 0) {
-            // Если чат закрыт - увеличиваем счетчик непрочитанных
             if (!isOpen) {
               const unreadFromOthers = newMsgs.filter(m => m.player_id !== playerId).length;
               setUnreadCount(c => c + unreadFromOthers);
@@ -84,12 +77,11 @@ const Chat: React.FC<ChatProps> = ({ roomId, playerId, playerName }) => {
   const toggleChat = () => {
     setIsOpen(!isOpen);
     if (!isOpen) {
-      setUnreadCount(0); // Сбрасываем счетчик при открытии
+      setUnreadCount(0);
     }
   };
 
   useEffect(() => {
-    // Прокрутка к последнему сообщению
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
@@ -125,8 +117,7 @@ const Chat: React.FC<ChatProps> = ({ roomId, playerId, playerName }) => {
   }
 
   return (
-    <div className="fixed bottom-4 left-4 z-50 w-80 h-96 bg-white dark:bg-gray-800 rounded-lg shadow-2xl flex flex-col border border-gray-200 dark:border-gray-700">
-      {/* Header */}
+    <div className="fixed bottom-24 left-4 z-50 w-80 h-96 bg-white dark:bg-gray-800 rounded-lg shadow-2xl flex flex-col border border-gray-200 dark:border-gray-700 transition-colors">
       <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-t-lg">
         <div className="flex items-center gap-2">
           <MessageSquare className="w-5 h-5" />
@@ -155,7 +146,6 @@ const Chat: React.FC<ChatProps> = ({ roomId, playerId, playerName }) => {
         </div>
       </div>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
         {messages.length === 0 ? (
           <div className="text-center text-gray-400 dark:text-gray-500 text-sm mt-8">
@@ -190,7 +180,6 @@ const Chat: React.FC<ChatProps> = ({ roomId, playerId, playerName }) => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
       <div className="p-3 border-t border-gray-200 dark:border-gray-700">
         <div className="flex gap-2">
           <input
