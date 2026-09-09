@@ -25,10 +25,25 @@ const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) =>
     
     const fetchAnimeImage = async () => {
       try {
-        const response = await fetch('https://api.waifu.pics/sfw/waifu');
-        const data = await response.json();
-        if (data.url) {
-          setAnimeImage(data.url);
+        // Используем несколько API для fallback
+        const apis = [
+          'https://nekos.life/api/v2/img/neko',
+          'https://api.waifu.pics/sfw/waifu',
+          'https://moe.jitsu.top/img/?sort=setu&size=mw1024'
+        ];
+        
+        for (const api of apis) {
+          try {
+            const response = await fetch(api);
+            const data = await response.json();
+            const imageUrl = data.url || data.image;
+            if (imageUrl) {
+              setAnimeImage(imageUrl);
+              return;
+            }
+          } catch {
+            continue;
+          }
         }
       } catch (error) {
         console.error('Failed to fetch anime image:', error);
