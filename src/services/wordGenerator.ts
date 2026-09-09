@@ -247,25 +247,9 @@ function canPlaceWord(
       // Если letter === null, это clue-клетка - можно размещать слово через неё
     }
 
-    // Проверяем соседние клетки (не должны быть буквами, кроме как продолжение слова)
-    if (!cell || cell.letter === null) {
-      // Проверяем всех 8 соседей
-      for (let dx = -1; dx <= 1; dx++) {
-        for (let dy = -1; dy <= 1; dy++) {
-          if (dx === 0 && dy === 0) continue;
-          
-          // Пропускаем соседей вдоль направления слова
-          const isAlongWord = (dx === vector.dx && dy === vector.dy) || 
-                             (dx === -vector.dx && dy === -vector.dy);
-          if (isAlongWord) continue;
-          
-          const neighbor = grid.get(`${x + dx},${y + dy}`);
-          if (neighbor && neighbor.letter !== null) {
-            return false;
-          }
-        }
-      }
-    }
+    // Убираем строгую проверку соседей для пустых клеток
+    // В сканворде слова могут быть близко друг к другу
+    // Проверка клеток ДО и ПОСЛЕ слова ниже обеспечит, что слова не слипаются
   }
 
   // Проверяем клетки ДО и ПОСЛЕ слова (не должны быть буквами)
