@@ -10,6 +10,7 @@ import Chat from './components/Chat';
 import {
   subscribeToGameState,
   subscribeToPlayers,
+  subscribeToRoomCrossword,
   getRoomLetters,
   getRoomPlayers,
   saveLetter,
@@ -32,6 +33,7 @@ function App() {
   const [isMultiplayer, setIsMultiplayer] = useState(false);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
+  const [creatorId, setCreatorId] = useState<string | null>(null);
   const [playerName, setPlayerName] = useState<string>(() => {
     return localStorage.getItem('playerName') || `Игрок${Math.floor(Math.random() * 1000)}`;
   });
@@ -118,11 +120,22 @@ function App() {
       getRoomPlayers(roomId).then(setPlayers);
     });
 
+    // Подписываемся на изменения кроссворда (когда создатель создаёт новый)
+    const crosswordSub = subscribeToRoomCrossword(roomId, (newCrosswordData) => {
+      // Проверяем, что это действительно новый кроссворд
+      if (newCrosswordData.id !== crossword?.id) {
+        setCrossword(newCrosswordData);
+        useCrosswordStore.getState().loadCrossword(newCrosswordData);
+        setElapsedSeconds(0);
+      }
+    });
+
     return () => {
       gameStateSub.unsubscribe();
       playersSub.unsubscribe();
+      crosswordSub.unsubscribe();
     };
-  }, [isMultiplayer, roomId, playerId]);
+  }, [isMultiplayer, roomId, playerId, crossword?.id]);
 
   // Сохраняем имя игрока
   useEffect(() => {
@@ -231,10 +244,30 @@ function App() {
   };
 
   const generateNew = async () => {
+    // В мультиплеере только создатель может создавать новый кроссворд
+    if (isMultiplayer && creatorId !== playerId) {
+      alert('Только создатель комнаты может создавать новый кроссворд');
+      return;
+    }
+
     setLoading(true);
     setElapsedSeconds(0);
     resetStore();
     const data = await crosswordApi.generateNew();
+    
+    // В мультиплеере обновляем кроссворд в комнате
+    if (isMultiplayer && roomId && playerId) {
+      try {
+        const { updateRoomCrossword } = await import('./services/multiplayerApi');
+        await updateRoomCrossword(roomId, playerId, data);
+      } catch (err) {
+        console.error('Failed to update room crossword:', err);
+        alert(err instanceof Error ? err.message : 'Ошибка обновления кроссворда');
+        setLoading(false);
+        return;
+      }
+    }
+    
     setCrossword(data);
     useCrosswordStore.getState().loadCrossword(data);
     setLoading(false);
@@ -262,15 +295,17 @@ function App() {
   const handleRoomCreated = (newRoomId: string, newPlayerId: string, code: string, crosswordData: CrosswordData) => {
     setRoomId(newRoomId);
     setPlayerId(newPlayerId);
+    setCreatorId(newPlayerId); // Создатель - это текущий игрок
     setIsMultiplayer(true);
     setShowMultiplayer(false);
     setCrossword(crosswordData);
     setLoading(false);
   };
 
-  const handleRoomJoined = (newRoomId: string, newPlayerId: string, crosswordData: CrosswordData) => {
+  const handleRoomJoined = (newRoomId: string, newPlayerId: string, crosswordData: CrosswordData, roomCreatorId: string) => {
     setRoomId(newRoomId);
     setPlayerId(newPlayerId);
+    setCreatorId(roomCreatorId); // Получаем создателя из комнаты
     setIsMultiplayer(true);
     setShowMultiplayer(false);
     setCrossword(crosswordData);
@@ -428,8 +463,9 @@ function App() {
             {/* New crossword button */}
             <button
               onClick={generateNew}
-              disabled={isMultiplayer}
+              disabled={isMultiplayer && creatorId !== playerId}
               className="flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-amber-400 to-orange-500 text-white rounded-lg hover:from-amber-500 hover:to-orange-600 transition-all shadow-md hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              title={isMultiplayer && creatorId !== playerId ? 'Только создатель комнаты может создавать новый кроссворд' : ''}
             >
               <Shuffle className="w-3.5 h-3.5" />
               <span className="hidden sm:inline text-sm">Новый</span>

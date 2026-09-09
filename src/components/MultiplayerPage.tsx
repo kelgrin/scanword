@@ -7,7 +7,7 @@ import { CrosswordData } from '../types/crossword';
 interface MultiplayerPageProps {
   onBack: () => void;
   onRoomCreated: (roomId: string, playerId: string, code: string, crosswordData: CrosswordData) => void;
-  onRoomJoined: (roomId: string, playerId: string, crosswordData: CrosswordData) => void;
+  onRoomJoined: (roomId: string, playerId: string, crosswordData: CrosswordData, creatorId: string) => void;
 }
 
 const MultiplayerPage: React.FC<MultiplayerPageProps> = ({ onBack, onRoomCreated, onRoomJoined }) => {
@@ -65,12 +65,12 @@ const MultiplayerPage: React.FC<MultiplayerPageProps> = ({ onBack, onRoomCreated
     setError('');
 
     try {
-      const { roomId, playerId, crosswordData } = await joinRoom(roomCode.trim(), playerName.trim());
+      const { roomId, playerId, crosswordData, creatorId } = await joinRoom(roomCode.trim(), playerName.trim());
       
       // Загружаем кроссворд в store
       useCrosswordStore.getState().loadCrossword(crosswordData);
       
-      onRoomJoined(roomId, playerId, crosswordData);
+      onRoomJoined(roomId, playerId, crosswordData, creatorId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ошибка присоединения к комнате');
     } finally {

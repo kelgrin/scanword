@@ -7,6 +7,7 @@ export interface GameRoom {
   created_at: string;
   is_active: boolean;
   player_count: number;
+  creator_id?: string;
 }
 
 export interface Player {
@@ -58,17 +59,18 @@ export async function createRoom(
   const roomId = crypto.randomUUID();
   const playerId = crypto.randomUUID();
   const code = generateRoomCode();
-
+  
   const { error } = await supabase.from('game_rooms').insert([{
     id: roomId,
     room_code: code,
     crossword_data: crosswordData,
     is_active: true,
     player_count: 1,
+    creator_id: playerId,
   }]);
-
+  
   if (error) throw new Error(`Failed to create room: ${error.message}`);
-
+  
   // Добавляем первого игрока
   const { error: playerError } = await supabase.from('players').insert([{
     room_id: roomId,
@@ -76,17 +78,152 @@ export async function createRoom(
     player_name: playerName,
     color: PLAYER_COLORS[0],
   }]);
-
+  
   if (playerError) throw new Error(`Failed to add player: ${playerError.message}`);
-
+  
   return { roomId, playerId, code };
 }
 
+// Обновить кроссворд в комнате (только для создателя)
+export async function updateRoomCrossword(
+  roomId: string,
+  creatorId: string,
+  crosswordData: CrosswordData
+): Promise<void> {
+  // Проверяем, что текущий игрок - создатель
+  const { data: room, error: roomError } = await supabase
+    .from('game_rooms')
+    .select('creator_id')
+    .eq('id', roomId)
+    .single();
+  
+  if (roomError || !room) {
+    throw new Error('Комната не найдена');
+  }
+  
+  if (room.creator_id !== creatorId) {
+    throw new Error('Только создатель комнаты может создавать новый кроссворд');
+  }
+  
+  // Обновляем кроссворд
+  const { error } = await supabase
+    .from('game_rooms')
+    .update({ crossword_data: crosswordData })
+    .eq('id', roomId);
+  
+  if (error) throw new Error(`Failed to update crossword: ${error.message}`);
+  
+  // Очищаем состояние игры
+  const { error: clearError } = await supabase
+    .from('game_state')
+    .delete()
+    .eq('room_id', roomId);
+  
+  if (clearError) throw new Error(`Failed to clear game state: ${clearError.message}`);
+}
+
+// Получить информацию о комнате
+export async function getRoomInfo(roomId: string): Promise<GameRoom | null> {
+  const { data, error } = await supabase
+    .from('game_rooms')
+    .select('*')
+    .eq('id', roomId)
+    .single();
+  
+  if (error || !data) return null;
+  return data;
+}
+
+// Подписаться на изменения кроссворда в комнате
+export function subscribeToRoomCrossword(
+  roomId: string,
+  callback: (crosswordData: CrosswordData) => void
+) {
+  let pollingInterval: ReturnType<typeof setInterval> | null = null;
+  let lastCrosswordId: string | null = null;
+  let isConnected = false;
+
+  // Polling fallback
+  const startPolling = () => {
+    if (pollingInterval) return;
+    console.log('[Multiplayer] Starting polling fallback for room crossword');
+    
+    pollingInterval = setInterval(async () => {
+      try {
+        const room = await getRoomInfo(roomId);
+        if (room && room.crossword_data.id !== lastCrosswordId) {
+          lastCrosswordId = room.crossword_data.id;
+          callback(room.crossword_data);
+        }
+      } catch (error) {
+        console.error('[Multiplayer] Crossword polling error:', error);
+      }
+    }, 2000);
+  };
+
+  const stopPolling = () => {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      pollingInterval = null;
+    }
+  };
+
+  // Try WebSocket first
+  const channel = supabase
+    .channel(`room-crossword-${roomId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'game_rooms',
+        filter: `id=eq.${roomId}`,
+      },
+      (payload) => {
+        isConnected = true;
+        stopPolling();
+        const newRoom = payload.new as GameRoom;
+        if (newRoom.crossword_data) {
+          callback(newRoom.crossword_data);
+        }
+      }
+    )
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        isConnected = true;
+        stopPolling();
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        isConnected = false;
+        startPolling();
+      }
+    });
+
+  // Start polling after 3 seconds if WebSocket doesn't connect
+  setTimeout(() => {
+    if (!isConnected) {
+      startPolling();
+    }
+  }, 3000);
+
+  // Initialize last crossword id
+  getRoomInfo(roomId).then(room => {
+    if (room) {
+      lastCrosswordId = room.crossword_data.id;
+    }
+  });
+
+  return {
+    unsubscribe: () => {
+      channel.unsubscribe();
+      stopPolling();
+    },
+  };
+}
 // Присоединиться к комнате по коду
 export async function joinRoom(
   roomCode: string,
   playerName: string
-): Promise<{ roomId: string; playerId: string; crosswordData: CrosswordData }> {
+): Promise<{ roomId: string; playerId: string; crosswordData: CrosswordData; creatorId: string }> {
   // Ищем комнату по коду
   const { data: room, error: roomError } = await supabase
     .from('game_rooms')
@@ -126,6 +263,7 @@ export async function joinRoom(
     roomId: room.id,
     playerId,
     crosswordData: room.crossword_data,
+    creatorId: room.creator_id || '',
   };
 }
 

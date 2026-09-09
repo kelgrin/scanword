@@ -6,7 +6,8 @@ CREATE TABLE game_rooms (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   last_activity TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   is_active BOOLEAN DEFAULT true,
-  player_count INTEGER DEFAULT 1
+  player_count INTEGER DEFAULT 1,
+  creator_id UUID
 );
 
 -- Таблица игроков
@@ -98,3 +99,8 @@ CREATE POLICY "Enable insert access for all users" ON chat_messages
 ALTER PUBLICATION supabase_realtime ADD TABLE game_state;
 ALTER PUBLICATION supabase_realtime ADD TABLE players;
 ALTER PUBLICATION supabase_realtime ADD TABLE chat_messages;
+ALTER PUBLICATION supabase_realtime ADD TABLE game_rooms;
+
+-- Для существующих таблиц добавляем поле creator_id (если таблица уже создана)
+-- Выполните этот запрос отдельно, если таблица game_rooms уже существует:
+-- ALTER TABLE game_rooms ADD COLUMN IF NOT EXISTS creator_id UUID;
