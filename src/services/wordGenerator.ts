@@ -61,7 +61,7 @@ const FALLBACK_WORD_POOL: WordEntry[] = [
 
 async function loadWordsFromDB(): Promise<WordEntry[]> {
   try {
-    const questions = await getQuestions(300);
+    const questions = await getQuestions(150);
     if (questions.length > 0) {
       console.log(`Loaded ${questions.length} words from Supabase`);
       return questions.map((q: Question) => ({
