@@ -208,23 +208,12 @@ function canPlaceWord(
       // Это позволяет словам быть близко друг к другу
     }
 
-    // Clue-клетка находится ПОСЛЕ слова, поэтому не может быть внутри него
-    // Но проверяем, что clue-клетка не совпадает с последней буквой слова
-    const lastWordX = startX + vector.dx * (len - 1);
-    const lastWordY = startY + vector.dy * (len - 1);
-    if (lastWordX === clueX && lastWordY === clueY) {
-      return false; // Clue-клетка совпадает с последней буквой слова
-    }
-  // Проверяем клетки ДО и ПОСЛЕ слова (не должны быть буквами)
-  const beforeX = startX - vector.dx;
-  const beforeY = startY - vector.dy;
+  // Проверяем клетку ПОСЛЕ слова (не должна быть буквой, чтобы слова не слипались)
+  // Клетка ПЕРЕД словом - это clue-клетка, она уже проверена выше
   const afterX = startX + vector.dx * len;
   const afterY = startY + vector.dy * len;
   
-  const before = grid.get(`${beforeX},${beforeY}`);
   const after = grid.get(`${afterX},${afterY}`);
-  
-  if (before && before.letter !== null) return false;
   if (after && after.letter !== null) return false;
 
   // Должно быть хотя бы одно пересечение (кроме первого слова)
