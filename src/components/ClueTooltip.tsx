@@ -28,28 +28,47 @@ const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) =>
       try {
         // Добавляем timestamp для уникальности каждой картинки
         const timestamp = Date.now();
-        const random = Math.random();
         
-        // Используем несколько API для hentai anime girl
+        // Используем надёжные API для hentai anime girl
         const apis = [
           `https://api.waifu.pics/nsfw/waifu?timestamp=${timestamp}`,
-          `https://nekos.life/api/v2/img/lewd?timestamp=${timestamp}`,
-          `https://moe.jitsu.top/img/?sort=setu&size=mw1024&timestamp=${timestamp}&random=${random}`
+          `https://nekos.life/api/v2/img/lewd?timestamp=${timestamp}`
         ];
         
         for (const api of apis) {
           try {
-            const response = await fetch(api);
+            // Добавляем таймаут для каждого запроса
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            
+            const response = await fetch(api, { 
+              signal: controller.signal,
+              headers: {
+                'Accept': 'application/json',
+              }
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) {
+              continue;
+            }
+            
             const data = await response.json();
             const imageUrl = data.url || data.image;
-            if (imageUrl) {
+            
+            if (imageUrl && typeof imageUrl === 'string' && imageUrl.startsWith('http')) {
               setAnimeImage(imageUrl);
               return;
             }
-          } catch {
+          } catch (error) {
+            // Игнорируем ошибки и пробуем следующий API
             continue;
           }
         }
+        
+        // Если все API не сработали, используем placeholder
+        console.warn('All anime image APIs failed, using placeholder');
       } catch (error) {
         console.error('Failed to fetch anime image:', error);
       }

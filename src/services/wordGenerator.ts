@@ -156,11 +156,11 @@ function canPlaceWord(
     if (x < 0 || x >= gridSize || y < 0 || y >= gridSize) return false;
   }
 
-  // Проверяем clue-клетку (одна клетка перед словом)
-  // Для horizontal: clue слева от startX
-  // Для vertical: clue сверху от startY
-  const clueX = startX - vector.dx;
-  const clueY = startY - vector.dy;
+  // Проверяем clue-клетку (одна клетка ПОСЛЕ слова)
+  // Для horizontal: clue справа от последней буквы
+  // Для vertical: clue снизу от последней буквы
+  const clueX = startX + vector.dx * len;
+  const clueY = startY + vector.dy * len;
   
   if (clueX < 0 || clueX >= gridSize || clueY < 0 || clueY >= gridSize) return false;
   
@@ -171,8 +171,8 @@ function canPlaceWord(
   // Проверяем, что clue-клетка не занята другой clue-клеткой
   for (const pw of placedWords) {
     const pwVector = getWordDirectionVector(pw.direction);
-    const existingClueX = pw.startX - pwVector.dx;
-    const existingClueY = pw.startY - pwVector.dy;
+    const existingClueX = pw.startX + pwVector.dx * pw.word.length;
+    const existingClueY = pw.startY + pwVector.dy * pw.word.length;
     if (existingClueX === clueX && existingClueY === clueY) return false;
   }
 
@@ -185,17 +185,6 @@ function canPlaceWord(
       if (pwX === clueX && pwY === clueY) {
         return false; // Clue-клетка находится внутри другого слова
       }
-    }
-    
-    // Проверяем, что clue-клетка не находится на продолжении другого слова
-    // (сразу после конца или сразу перед началом)
-    const pwEndX = pw.startX + pwVector.dx * pw.word.length;
-    const pwEndY = pw.startY + pwVector.dy * pw.word.length;
-    const pwBeforeX = pw.startX - pwVector.dx;
-    const pwBeforeY = pw.startY - pwVector.dy;
-    
-    if ((clueX === pwEndX && clueY === pwEndY) || (clueX === pwBeforeX && clueY === pwBeforeY)) {
-      return false; // Clue-клетка находится на продолжении другого слова
     }
   }
 
@@ -219,13 +208,12 @@ function canPlaceWord(
       // Это позволяет словам быть близко друг к другу
     }
 
-    // ВАЖНО: Проверяем, что clue-клетка не находится внутри текущего слова
-    for (let i = 0; i < len; i++) {
-      const wordX = startX + vector.dx * i;
-      const wordY = startY + vector.dy * i;
-      if (wordX === clueX && wordY === clueY) {
-        return false; // Clue-клетка находится внутри текущего слова
-      }
+    // Clue-клетка находится ПОСЛЕ слова, поэтому не может быть внутри него
+    // Но проверяем, что clue-клетка не совпадает с последней буквой слова
+    const lastWordX = startX + vector.dx * (len - 1);
+    const lastWordY = startY + vector.dy * (len - 1);
+    if (lastWordX === clueX && lastWordY === clueY) {
+      return false; // Clue-клетка совпадает с последней буквой слова
     }
   // Проверяем клетки ДО и ПОСЛЕ слова (не должны быть буквами)
   const beforeX = startX - vector.dx;
@@ -486,11 +474,11 @@ function buildCrosswordData(
     }
   }
 
-  // Заполняем clue-клетки
+  // Заполняем clue-клетки ПОСЛЕ слова
   for (const pw of normalizedWords) {
     const vector = getWordDirectionVector(pw.direction);
-    const clueX = pw.startX - vector.dx;
-    const clueY = pw.startY - vector.dy;
+    const clueX = pw.startX + vector.dx * pw.word.length;
+    const clueY = pw.startY + vector.dy * pw.word.length;
     
     // Стрелка указывает НАПРАВЛЕНИЕ СЛОВА
     const arrowDirection: Direction = pw.direction === 'horizontal' ? 'right' : 'down';
