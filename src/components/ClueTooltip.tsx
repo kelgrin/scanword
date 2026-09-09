@@ -35,8 +35,10 @@ const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) =>
           const summaryData = await summaryResponse.json();
           
           if (summaryData.extract) {
-            const firstSentence = summaryData.extract.split('.')[0] + '.';
-            setWebInfo(firstSentence);
+            // Берем первые 2-3 предложения
+            const sentences = summaryData.extract.split('.');
+            const firstFewSentences = sentences.slice(0, 3).join('.').trim();
+            setWebInfo(firstFewSentences + (firstFewSentences.endsWith('.') ? '' : '.'));
           }
         }
       } catch (error) {
@@ -118,7 +120,9 @@ const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) =>
                 <Globe size={10} />
                 <span className="font-medium">Из Википедии:</span>
               </div>
-              <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">{webInfo}</p>
+              <div className="max-h-32 overflow-y-auto">
+                <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">{webInfo}</p>
+              </div>
             </div>
           )}
           

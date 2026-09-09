@@ -176,17 +176,29 @@ function App() {
         // Добавляем/обновляем буквы из БД
         letters.forEach((letter) => {
           const currentCell = currentCells.find(c => c.id === letter.cell_id);
-          // Обновляем только если буква отличается
-          if (currentCell && currentCell.userInput !== letter.letter) {
+          
+          // Обновляем только если:
+          // 1. Локальной буквы нет, или
+          // 2. Локальная буква от другого игрока, или
+          // 3. Локальная буква от текущего игрока, но отличается от серверной (значит другой игрок её изменил)
+          if (!currentCell || !currentCell.userInput) {
+            // Клетка пуста локально - добавляем из БД
+            useCrosswordStore.getState().setInput(letter.cell_id, letter.letter, letter.player_color, letter.player_id);
+          } else if (currentCell.playerId !== playerId && currentCell.userInput !== letter.letter) {
+            // Буква от другого игрока и отличается - обновляем
             useCrosswordStore.getState().setInput(letter.cell_id, letter.letter, letter.player_color, letter.player_id);
           }
+          // Если буква от текущего игрока - не трогаем (избегаем лагов)
         });
         
         // Удаляем буквы, которых нет в БД (были удалены другим игроком)
         currentCells.forEach((cell) => {
           if (cell.userInput && !dbCellIds.has(cell.id)) {
             // Эта буква есть локально, но отсутствует в БД - значит её удалили
-            useCrosswordStore.getState().clearInput(cell.id);
+            // Удаляем только если буква от другого игрока
+            if (cell.playerId !== playerId) {
+              useCrosswordStore.getState().clearInput(cell.id);
+            }
           }
         });
         
@@ -201,7 +213,7 @@ function App() {
     return () => {
       clearInterval(syncInterval);
     };
-  }, [isMultiplayer, roomId]);
+  }, [isMultiplayer, roomId, playerId]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
