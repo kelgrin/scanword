@@ -189,15 +189,23 @@ const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) =>
             // Anime режим
             <div className="border-t border-gray-100 dark:border-gray-700 pt-2 mt-2">
               {animeImage ? (
-                <img 
-                  src={animeImage} 
-                  alt="Anime girl" 
+                <div 
                   onClick={() => setIsExpanded(!isExpanded)}
-                  className={`w-full rounded-lg object-cover cursor-pointer transition-all duration-300 ${
-                    isExpanded ? 'max-h-[75vh] scale-100' : 'max-h-48 hover:opacity-90'
+                  className={`rounded-lg cursor-pointer transition-all duration-300 ${
+                    isExpanded ? 'flex items-center justify-center' : ''
                   }`}
                   title={isExpanded ? 'Нажмите, чтобы уменьшить' : 'Нажмите, чтобы увеличить'}
-                />
+                >
+                  <img 
+                    src={animeImage} 
+                    alt="Anime girl" 
+                    className={`rounded-lg transition-all duration-300 ${
+                      isExpanded 
+                        ? 'max-w-full max-h-[80vh] w-auto h-auto object-contain' 
+                        : 'w-full max-h-48 object-cover hover:opacity-90'
+                    }`}
+                  />
+                </div>
               ) : (
                 <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
                   <Loader2 size={12} className="animate-spin" />
