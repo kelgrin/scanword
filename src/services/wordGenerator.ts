@@ -281,8 +281,8 @@ function canPlaceWord(
   if (before && before.letter !== null) return false;
   if (after && after.letter !== null) return false;
 
-  // НЕ требуем обязательных пересечений - разрешаем размещать слова рядом
-  // Пересечения будут учитываться при выборе лучшего варианта
+  // Требуем обязательного пересечения для всех слов кроме первого
+  if (placedWords.length > 0 && !hasIntersection) return false;
 
   return true;
 }
@@ -300,7 +300,7 @@ function findPossiblePlacements(
   const wordDirections: WordDirection[] = ['horizontal', 'vertical'];
   const clueDirections: ClueDirection[] = ['left', 'right', 'up', 'down', 'up-left', 'up-right', 'down-left', 'down-right'];
 
-  // 1. Сначала ищем позиции с пересечениями (по общим буквам)
+  // Ищем позиции с пересечениями (по общим буквам)
   for (const placed of placedWords) {
     const placedVector = getWordDirectionVector(placed.direction);
     
@@ -328,41 +328,6 @@ function findPossiblePlacements(
                     if (cell && cell.letter !== null) intersections++;
                   }
                   placements.push({ direction, clueDirection, startX, startY, clueWidth, intersections });
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // 2. Если не нашли позиций с пересечениями, ищем позиции рядом с уже размещёнными словами
-  if (placements.length === 0 && placedWords.length > 0) {
-    for (const placed of placedWords) {
-      const placedVector = getWordDirectionVector(placed.direction);
-      
-      // Ищем позиции рядом с каждой буквой размещённого слова
-      for (let pi = 0; pi < placed.word.length; pi++) {
-        const baseX = placed.startX + placedVector.dx * pi;
-        const baseY = placed.startY + placedVector.dy * pi;
-        
-        // Пробуем разместить новое слово рядом (в радиусе 2 клеток)
-        for (let offsetX = -2; offsetX <= 2; offsetX++) {
-          for (let offsetY = -2; offsetY <= 2; offsetY++) {
-            if (offsetX === 0 && offsetY === 0) continue;
-            
-            for (const direction of wordDirections) {
-              const vector = getWordDirectionVector(direction);
-              
-              for (const clueDirection of clueDirections) {
-                for (const clueWidth of [1, 2]) {
-                  const startX = baseX + offsetX;
-                  const startY = baseY + offsetY;
-
-                  if (canPlaceWord(entry, direction, clueDirection, startX, startY, clueWidth, grid, placedWords, gridSize)) {
-                    placements.push({ direction, clueDirection, startX, startY, clueWidth, intersections: 0 });
-                  }
                 }
               }
             }

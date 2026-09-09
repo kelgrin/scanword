@@ -89,29 +89,70 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
       }
     };
 
+    const getArrowStyle = () => {
+      if (!cell.direction) return {};
+      
+      const arrowSize = 20;
+      const offset = 8; // Насколько стрелка "залезает" в соседнюю клетку
+      
+      switch (cell.direction) {
+        case 'right':
+          return {
+            right: `-${offset}px`,
+            top: '50%',
+            transform: 'translateY(-50%)',
+          };
+        case 'left':
+          return {
+            left: `-${offset}px`,
+            top: '50%',
+            transform: 'translateY(-50%) scaleX(-1)',
+          };
+        case 'down':
+          return {
+            bottom: `-${offset}px`,
+            left: '50%',
+            transform: 'translateX(-50%) rotate(90deg)',
+          };
+        case 'up':
+          return {
+            top: `-${offset}px`,
+            left: '50%',
+            transform: 'translateX(-50%) rotate(-90deg)',
+          };
+        case 'down-right':
+          return {
+            right: `-${offset}px`,
+            bottom: `-${offset}px`,
+            transform: 'rotate(45deg)',
+          };
+        case 'down-left':
+          return {
+            left: `-${offset}px`,
+            bottom: `-${offset}px`,
+            transform: 'rotate(-45deg) scaleX(-1)',
+          };
+        case 'up-right':
+          return {
+            right: `-${offset}px`,
+            top: `-${offset}px`,
+            transform: 'rotate(-45deg)',
+          };
+        case 'up-left':
+          return {
+            left: `-${offset}px`,
+            top: `-${offset}px`,
+            transform: 'rotate(45deg) scaleX(-1)',
+          };
+        default:
+          return {};
+      }
+    };
+
     const getDirectionIcon = () => {
       if (!cell.direction) return null;
-      const iconSize = 12;
-      switch (cell.direction) {
-        case 'up':
-          return <ArrowUp size={iconSize} className="text-gray-500" />;
-        case 'down':
-          return <ArrowDown size={iconSize} className="text-gray-500" />;
-        case 'left':
-          return <ArrowLeft size={iconSize} className="text-gray-500" />;
-        case 'right':
-          return <ArrowRight size={iconSize} className="text-gray-500" />;
-        case 'up-left':
-          return <ArrowUp size={iconSize} className="text-gray-500 -rotate-45" />;
-        case 'up-right':
-          return <ArrowUp size={iconSize} className="text-gray-500 rotate-45" />;
-        case 'down-left':
-          return <ArrowDown size={iconSize} className="text-gray-500 rotate-45" />;
-        case 'down-right':
-          return <ArrowDown size={iconSize} className="text-gray-500 -rotate-45" />;
-        default:
-          return null;
-      }
+      const iconSize = 16;
+      return <ArrowRight size={iconSize} className="text-gray-600 dark:text-gray-300" strokeWidth={2.5} />;
     };
 
     if (cell.type === 'black') {
@@ -142,9 +183,14 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
           <span className="text-[8px] leading-[1.2] text-gray-700 dark:text-gray-300 text-center px-0.5 font-medium">
             {cell.clueText}
           </span>
-          <div className="mt-0.5">
-            {getDirectionIcon()}
-          </div>
+          {cell.direction && (
+            <div 
+              className="absolute pointer-events-none"
+              style={getArrowStyle()}
+            >
+              {getDirectionIcon()}
+            </div>
+          )}
           {showTooltip && targetWord && (
             <ClueTooltip
               text={targetWord.clueText}
