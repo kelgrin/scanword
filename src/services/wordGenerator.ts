@@ -176,6 +176,29 @@ function canPlaceWord(
     if (existingClueX === clueX && existingClueY === clueY) return false;
   }
 
+  // ВАЖНО: Проверяем, что clue-клетка не находится внутри другого слова
+  for (const pw of placedWords) {
+    const pwVector = getWordDirectionVector(pw.direction);
+    for (let i = 0; i < pw.word.length; i++) {
+      const pwX = pw.startX + pwVector.dx * i;
+      const pwY = pw.startY + pwVector.dy * i;
+      if (pwX === clueX && pwY === clueY) {
+        return false; // Clue-клетка находится внутри другого слова
+      }
+    }
+    
+    // Проверяем, что clue-клетка не находится на продолжении другого слова
+    // (сразу после конца или сразу перед началом)
+    const pwEndX = pw.startX + pwVector.dx * pw.word.length;
+    const pwEndY = pw.startY + pwVector.dy * pw.word.length;
+    const pwBeforeX = pw.startX - pwVector.dx;
+    const pwBeforeY = pw.startY - pwVector.dy;
+    
+    if ((clueX === pwEndX && clueY === pwEndY) || (clueX === pwBeforeX && clueY === pwBeforeY)) {
+      return false; // Clue-клетка находится на продолжении другого слова
+    }
+  }
+
     // Проверяем каждую клетку слова
     let hasIntersection = false;
     for (let i = 0; i < len; i++) {
@@ -194,6 +217,15 @@ function canPlaceWord(
       }
       // Убрали строгую проверку соседей для пустых клеток
       // Это позволяет словам быть близко друг к другу
+    }
+
+    // ВАЖНО: Проверяем, что clue-клетка не находится внутри текущего слова
+    for (let i = 0; i < len; i++) {
+      const wordX = startX + vector.dx * i;
+      const wordY = startY + vector.dy * i;
+      if (wordX === clueX && wordY === clueY) {
+        return false; // Clue-клетка находится внутри текущего слова
+      }
     }
   // Проверяем клетки ДО и ПОСЛЕ слова (не должны быть буквами)
   const beforeX = startX - vector.dx;
