@@ -263,24 +263,12 @@ function canPlaceWord(
     // Проверка клеток ДО и ПОСЛЕ слова ниже обеспечит, что слова не слипаются
   }
 
-  // Проверяем клетки ДО и ПОСЛЕ слова (не должны быть буквами)
-  const beforeX = startX - vector.dx;
-  const beforeY = startY - vector.dy;
-  const afterX = startX + vector.dx * len;
-  const afterY = startY + vector.dy * len;
+  // УБРАЛИ проверку клеток ДО и ПОСЛЕ слова
+  // В сканворде слова могут быть близко друг к другу
+  // Это было главной причиной почему генерировалось только одно слово
   
-  const before = grid.get(`${beforeX},${beforeY}`);
-  const after = grid.get(`${afterX},${afterY}`);
-  
-  if (before && before.letter !== null) return false;
-  if (after && after.letter !== null) return false;
-
-  // НЕ требуем обязательного пересечения - разрешаем размещение рядом
-  // Это гарантирует, что сканворд будет генерироваться
-
   return true;
 }
-
 // ============================================================
 // Найти все возможные позиции для слова
 // ============================================================
