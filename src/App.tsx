@@ -8,7 +8,7 @@ import DraggableGrid from './components/DraggableGrid';
 import MultiplayerPage from './components/MultiplayerPage';
 import Chat from './components/Chat';
 import AuthModal from './components/AuthModal';
-import SettingsModal from './components/SettingsModal';
+import ProfileModal from './components/ProfileModal';
 import {
   subscribeToGameState,
   subscribeToPlayers,
@@ -68,10 +68,8 @@ function App() {
   const cells = useCrosswordStore((state) => state.cells);
 
   useEffect(() => {
-    loadCrossword();
-    
-    // Load user settings on mount
-    const loadUserSettings = async () => {
+    // Load user settings first, then load crossword
+    const initialize = async () => {
       try {
         const settings = await getSettings();
         if (settings) {
@@ -80,9 +78,12 @@ function App() {
       } catch (err) {
         console.error('Failed to load settings:', err);
       }
+      
+      // Load crossword after settings are loaded
+      loadCrossword();
     };
     
-    loadUserSettings();
+    initialize();
   }, []);
 
   // Auth state listener
@@ -721,15 +722,28 @@ function App() {
         }}
       />
 
-      {/* Settings modal */}
-      <SettingsModal
+      {/* Profile modal */}
+      <ProfileModal
         isOpen={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}
-        onSettingsChange={async () => {
-          // Reload settings
-          const settings = await getSettings();
-          if (settings) {
-            setWordsPerCrossword(settings.words_per_crossword);
+        onSettingsChange={(wordsCount) => {
+          setWordsPerCrossword(wordsCount);
+        }}
+        onLoadProgress={async (crosswordId) => {
+          // Load saved progress
+          const { loadProgress } = await import('./services/userService');
+          const progress = await loadProgress(crosswordId);
+          if (progress) {
+            const data = progress.crossword_data;
+            setCrossword(data);
+            useCrosswordStore.getState().loadCrossword(data);
+            
+            // Restore cells state
+            progress.cells_state && Object.entries(progress.cells_state).forEach(([cellId, letter]) => {
+              useCrosswordStore.getState().setInput(cellId, letter as string);
+            });
+            
+            setElapsedSeconds(progress.time_spent || 0);
           }
         }}
       />

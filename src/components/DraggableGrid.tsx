@@ -53,17 +53,20 @@ const DraggableGrid: React.FC<DraggableGridProps> = ({ children }) => {
   return (
     <div
       ref={containerRef}
-      className="overflow-auto cursor-grab active:cursor-grabbing select-none"
+      className="overflow-auto cursor-grab active:cursor-grabbing select-none border border-gray-200 dark:border-gray-700 rounded-lg"
       style={{ 
-        maxWidth: '100%',
-        maxHeight: 'calc(100vh - 120px)'
+        width: '100%',
+        height: 'calc(100vh - 200px)',
+        minHeight: '400px'
       }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
-      {children}
+      <div className="p-4 min-w-fit min-h-fit">
+        {children}
+      </div>
     </div>
   );
 };

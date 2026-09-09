@@ -223,8 +223,8 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword, playerColor, p
     <div
       className="crossword-grid inline-grid gap-[2px] bg-gray-300 dark:bg-gray-700 p-[2px] rounded-lg shadow-inner transition-colors"
       style={{
-        gridTemplateColumns: `repeat(${crossword.width}, minmax(40px, 1fr))`,
-        gridTemplateRows: `repeat(${crossword.height}, minmax(40px, 1fr))`,
+        gridTemplateColumns: `repeat(${crossword.width}, 60px)`,
+        gridTemplateRows: `repeat(${crossword.height}, 60px)`,
       }}
     >
       {cells.map((cell) => (
