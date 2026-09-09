@@ -15,6 +15,7 @@ const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) =>
   const [showAnimeMode, setShowAnimeMode] = useState(() => {
     return localStorage.getItem('showAnimeMode') === 'true';
   });
+  const [isExpanded, setIsExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
@@ -128,13 +129,33 @@ const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) =>
   }, []);
 
   return (
-    <div
-      ref={tooltipRef}
-      className="fixed z-[9999] animate-fade-in"
-      style={position ? { top: position.top, left: position.left, minWidth: '220px', maxWidth: '300px' } : { visibility: 'hidden' }}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-3 relative transition-colors">
+    <>
+      {isExpanded && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-[9998]"
+          onClick={() => setIsExpanded(false)}
+        />
+      )}
+      <div
+        ref={tooltipRef}
+        className={`fixed z-[9999] transition-all duration-300 ${isExpanded ? 'animate-fade-in' : 'animate-fade-in'}`}
+        style={
+          isExpanded 
+            ? { 
+                top: '50%', 
+                left: '50%', 
+                transform: 'translate(-50%, -50%)', 
+                width: '75vw', 
+                maxWidth: '90vw',
+                maxHeight: '90vh'
+              } 
+            : position 
+              ? { top: position.top, left: position.left, minWidth: '220px', maxWidth: '300px' } 
+              : { visibility: 'hidden' }
+        }
+        onClick={(e) => e.stopPropagation()}
+      >
+      <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-3 relative transition-colors ${isExpanded ? 'overflow-y-auto max-h-[90vh]' : ''}`}>
         <div className="absolute top-1 right-1 flex gap-1">
           <button
             onClick={() => setShowAnimeMode(!showAnimeMode)}
@@ -171,7 +192,11 @@ const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) =>
                 <img 
                   src={animeImage} 
                   alt="Anime girl" 
-                  className="w-full rounded-lg max-h-48 object-cover"
+                  onClick={() => setIsExpanded(!isExpanded)}
+                  className={`w-full rounded-lg object-cover cursor-pointer transition-all duration-300 ${
+                    isExpanded ? 'max-h-[75vh] scale-100' : 'max-h-48 hover:opacity-90'
+                  }`}
+                  title={isExpanded ? 'Нажмите, чтобы уменьшить' : 'Нажмите, чтобы увеличить'}
                 />
               ) : (
                 <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
@@ -213,15 +238,18 @@ const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) =>
       </div>
       
       {/* Arrow */}
-      <div
-        className="absolute left-1/2 -translate-x-1/2 -bottom-2 w-0 h-0"
-        style={{
-          borderLeft: '8px solid transparent',
-          borderRight: '8px solid transparent',
-          borderTop: '8px solid white',
-        }}
-      />
-    </div>
+      {!isExpanded && (
+        <div
+          className="absolute left-1/2 -translate-x-1/2 -bottom-2 w-0 h-0"
+          style={{
+            borderLeft: '8px solid transparent',
+            borderRight: '8px solid transparent',
+            borderTop: '8px solid white',
+          }}
+        />
+      )}
+      </div>
+    </>
   );
 };
 

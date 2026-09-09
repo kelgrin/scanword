@@ -1,5 +1,5 @@
 export type CellType = 'black' | 'empty' | 'clue';
-export type Direction = 'up' | 'down' | 'left' | 'right';
+export type Direction = 'up' | 'down' | 'left' | 'right' | 'up-left' | 'up-right' | 'down-left' | 'down-right';
 
 export interface Cell {
   id: string;

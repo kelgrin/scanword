@@ -5,8 +5,8 @@ import { getQuestions, Question } from './supabaseApi';
 // Словарь русских слов с определениями (fallback)
 // ============================================================
 interface WordEntry {
-  word: string; // слово ВЕРХНИМ регистром
-  clue: string; // определение / вопрос
+  word: string;
+  clue: string;
 }
 
 const FALLBACK_WORD_POOL: WordEntry[] = [
@@ -98,18 +98,21 @@ export function resetWordPoolCache() {
 // ============================================================
 // Типы для внутреннего алгоритма
 // ============================================================
+type WordDirection = 'horizontal' | 'vertical' | 'diagonal-right' | 'diagonal-left';
+
 interface PlacedWord {
   id: string;
   word: string;
   clue: string;
-  direction: 'horizontal' | 'vertical';
+  direction: WordDirection;
   startX: number;
   startY: number;
+  clueWidth: number; // 1 или 2 клетки
 }
 
 interface GridCell {
-  letter: string | null; // буква или null
-  wordIds: string[]; // ID слов, проходящих через эту клетку
+  letter: string | null;
+  wordIds: string[];
 }
 
 // ============================================================
@@ -124,28 +127,47 @@ function shuffleArray<T>(arr: T[]): T[] {
   return a;
 }
 
-function getLetterAt(placed: PlacedWord, index: number): string {
-  return placed.word[index];
-}
-
-function getCellCoords(placed: PlacedWord, index: number): { x: number; y: number } {
-  if (placed.direction === 'horizontal') {
-    return { x: placed.startX + index, y: placed.startY };
+function getDirectionVector(direction: WordDirection): { dx: number; dy: number } {
+  switch (direction) {
+    case 'horizontal': return { dx: 1, dy: 0 };
+    case 'vertical': return { dx: 0, dy: 1 };
+    case 'diagonal-right': return { dx: 1, dy: 1 };
+    case 'diagonal-left': return { dx: -1, dy: 1 };
   }
-  return { x: placed.startX, y: placed.startY + index };
 }
 
-function getCluePosition(placed: PlacedWord): { x: number; y: number } {
-  // Clue-клетка стоит ПЕРЕД первой буквой (в обратном направлении чтения)
-  if (placed.direction === 'horizontal') {
-    return { x: placed.startX - 1, y: placed.startY };
+function getDirectionFromVector(dx: number, dy: number): WordDirection {
+  if (dx === 1 && dy === 0) return 'horizontal';
+  if (dx === 0 && dy === 1) return 'vertical';
+  if (dx === 1 && dy === 1) return 'diagonal-right';
+  if (dx === -1 && dy === 1) return 'diagonal-left';
+  return 'horizontal';
+}
+
+function getCluePosition(placed: PlacedWord): { x: number; y: number }[] {
+  const vector = getDirectionVector(placed.direction);
+  // Clue-клетка(и) стоят ПЕРЕД первой буквой (в обратном направлении)
+  const positions = [];
+  for (let i = 0; i < placed.clueWidth; i++) {
+    positions.push({
+      x: placed.startX - vector.dx * (i + 1),
+      y: placed.startY - vector.dy * (i + 1),
+    });
   }
-  return { x: placed.startX, y: placed.startY - 1 };
+  return positions;
 }
 
-function getDirection(placed: PlacedWord): Direction {
-  // Направление стрелки = направление чтения слова
-  return placed.direction === 'horizontal' ? 'right' : 'down';
+function getArrowDirection(placed: PlacedWord): Direction {
+  const vector = getDirectionVector(placed.direction);
+  if (vector.dx === 1 && vector.dy === 0) return 'right';
+  if (vector.dx === 0 && vector.dy === 1) return 'down';
+  if (vector.dx === 1 && vector.dy === 1) return 'down-right';
+  if (vector.dx === -1 && vector.dy === 1) return 'down-left';
+  if (vector.dx === -1 && vector.dy === 0) return 'left';
+  if (vector.dx === 0 && vector.dy === -1) return 'up';
+  if (vector.dx === 1 && vector.dy === -1) return 'up-right';
+  if (vector.dx === -1 && vector.dy === -1) return 'up-left';
+  return 'right';
 }
 
 // ============================================================
@@ -153,60 +175,70 @@ function getDirection(placed: PlacedWord): Direction {
 // ============================================================
 function canPlaceWord(
   entry: WordEntry,
-  direction: 'horizontal' | 'vertical',
+  direction: WordDirection,
   startX: number,
   startY: number,
+  clueWidth: number,
   grid: Map<string, GridCell>,
   placedWords: PlacedWord[],
   gridSize: number
 ): boolean {
   const word = entry.word;
   const len = word.length;
+  const vector = getDirectionVector(direction);
 
   // Проверяем, что все клетки слова помещаются в сетку
   for (let i = 0; i < len; i++) {
-    const { x, y } = direction === 'horizontal'
-      ? { x: startX + i, y: startY }
-      : { x: startX, y: startY + i };
+    const x = startX + vector.dx * i;
+    const y = startY + vector.dy * i;
     if (x < 0 || x >= gridSize || y < 0 || y >= gridSize) return false;
   }
 
-  // Проверяем clue-клетку
-  const cluePos = direction === 'horizontal'
-    ? { x: startX - 1, y: startY }
-    : { x: startX, y: startY - 1 };
-  if (cluePos.x < 0 || cluePos.x >= gridSize || cluePos.y < 0 || cluePos.y >= gridSize) return false;
-  
-  // Clue-клетка не должна быть занята буквой
-  const clueKey = `${cluePos.x},${cluePos.y}`;
-  const clueCell = grid.get(clueKey);
-  if (clueCell && clueCell.letter !== null) return false;
-  
-  // Проверяем, что clue-клетка не занята другой clue-клеткой
-  for (const pw of placedWords) {
-    const existingClue = getCluePosition(pw);
-    if (existingClue.x === cluePos.x && existingClue.y === cluePos.y) return false;
+  // Проверяем clue-клетки
+  const cluePositions = [];
+  for (let i = 0; i < clueWidth; i++) {
+    const cx = startX - vector.dx * (i + 1);
+    const cy = startY - vector.dy * (i + 1);
+    if (cx < 0 || cx >= gridSize || cy < 0 || cy >= gridSize) return false;
+    cluePositions.push({ x: cx, y: cy });
   }
-  
-  // ВАЖНО: Проверяем, что clue-клетка не находится в клетке, которая является буквой другого слова
-  // Это предотвращает ситуацию, когда вопрос блокирует букву
+
+  // Clue-клетки не должны быть заняты буквами
+  for (const pos of cluePositions) {
+    const clueKey = `${pos.x},${pos.y}`;
+    const clueCell = grid.get(clueKey);
+    if (clueCell && clueCell.letter !== null) return false;
+  }
+
+  // Проверяем, что clue-клетки не заняты другими clue-клетками
   for (const pw of placedWords) {
-    for (let i = 0; i < pw.word.length; i++) {
-      const { x, y } = pw.direction === 'horizontal'
-        ? { x: pw.startX + i, y: pw.startY }
-        : { x: pw.startX, y: pw.startY + i };
-      if (x === cluePos.x && y === cluePos.y) {
-        // Clue-клетка находится в клетке, которая является буквой другого слова
-        return false;
+    const existingClues = getCluePosition(pw);
+    for (const existingClue of existingClues) {
+      for (const newClue of cluePositions) {
+        if (existingClue.x === newClue.x && existingClue.y === newClue.y) return false;
       }
     }
   }
+
+  // Проверяем, что clue-клетки не находятся в клетках, которые являются буквами других слов
+  for (const pw of placedWords) {
+    const pwVector = getDirectionVector(pw.direction);
+    for (let i = 0; i < pw.word.length; i++) {
+      const x = pw.startX + pwVector.dx * i;
+      const y = pw.startY + pwVector.dy * i;
+      for (const cluePos of cluePositions) {
+        if (x === cluePos.x && y === cluePos.y) {
+          return false;
+        }
+      }
+    }
+  }
+
   // Проверяем каждую клетку слова
   let hasIntersection = false;
   for (let i = 0; i < len; i++) {
-    const { x, y } = direction === 'horizontal'
-      ? { x: startX + i, y: startY }
-      : { x: startX, y: startY + i };
+    const x = startX + vector.dx * i;
+    const y = startY + vector.dy * i;
     const key = `${x},${y}`;
     const cell = grid.get(key);
     const letter = word[i];
@@ -214,46 +246,45 @@ function canPlaceWord(
     if (cell) {
       if (cell.letter !== null) {
         // Клетка уже содержит букву — должно быть пересечение
-        if (cell.letter !== letter) return false; // конфликт букв
+        if (cell.letter !== letter) return false;
         hasIntersection = true;
       } else {
-        // Клетка существует как clue — нельзя
         return false;
       }
     }
 
     // Проверяем соседние клетки (не должны быть буквами, кроме как продолжение слова)
-    // Это предотвращает слипание слов
     if (!cell || cell.letter === null) {
-      // Проверяем перпендикулярных соседей
-      if (direction === 'horizontal') {
-        // Соседи сверху и снизу не должны быть буквами
-        const above = grid.get(`${x},${y - 1}`);
-        const below = grid.get(`${x},${y + 1}`);
-        if (above && above.letter !== null) return false;
-        if (below && below.letter !== null) return false;
-      } else {
-        // Соседи слева и справа не должны быть буквами
-        const left = grid.get(`${x - 1},${y}`);
-        const right = grid.get(`${x + 1},${y}`);
-        if (left && left.letter !== null) return false;
-        if (right && right.letter !== null) return false;
+      // Проверяем всех 8 соседей
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          if (dx === 0 && dy === 0) continue;
+          
+          // Пропускаем соседей вдоль направления слова
+          const isAlongWord = (dx === vector.dx && dy === vector.dy) || 
+                             (dx === -vector.dx && dy === -vector.dy);
+          if (isAlongWord) continue;
+          
+          const neighbor = grid.get(`${x + dx},${y + dy}`);
+          if (neighbor && neighbor.letter !== null) {
+            return false;
+          }
+        }
       }
     }
   }
 
   // Проверяем клетки ДО и ПОСЛЕ слова (не должны быть буквами)
-  if (direction === 'horizontal') {
-    const before = grid.get(`${startX - 1},${startY}`);
-    const after = grid.get(`${startX + len},${startY}`);
-    if (before && before.letter !== null) return false;
-    if (after && after.letter !== null) return false;
-  } else {
-    const before = grid.get(`${startX},${startY - 1}`);
-    const after = grid.get(`${startX},${startY + len}`);
-    if (before && before.letter !== null) return false;
-    if (after && after.letter !== null) return false;
-  }
+  const beforeX = startX - vector.dx;
+  const beforeY = startY - vector.dy;
+  const afterX = startX + vector.dx * len;
+  const afterY = startY + vector.dy * len;
+  
+  const before = grid.get(`${beforeX},${beforeY}`);
+  const after = grid.get(`${afterX},${afterY}`);
+  
+  if (before && before.letter !== null) return false;
+  if (after && after.letter !== null) return false;
 
   // Должно быть хотя бы одно пересечение (кроме первого слова)
   if (placedWords.length > 0 && !hasIntersection) return false;
@@ -269,48 +300,37 @@ function findPossiblePlacements(
   grid: Map<string, GridCell>,
   placedWords: PlacedWord[],
   gridSize: number
-): { direction: 'horizontal' | 'vertical'; startX: number; startY: number; intersections: number }[] {
-  const placements: { direction: 'horizontal' | 'vertical'; startX: number; startY: number; intersections: number }[] = [];
+): { direction: WordDirection; startX: number; startY: number; clueWidth: number; intersections: number }[] {
+  const placements: { direction: WordDirection; startX: number; startY: number; clueWidth: number; intersections: number }[] = [];
+  const directions: WordDirection[] = ['horizontal', 'vertical', 'diagonal-right', 'diagonal-left'];
 
   for (const placed of placedWords) {
+    const placedVector = getDirectionVector(placed.direction);
+    
     for (let pi = 0; pi < placed.word.length; pi++) {
       for (let ei = 0; ei < entry.word.length; ei++) {
         if (placed.word[pi] === entry.word[ei]) {
-          // Попробуем горизонтальное размещение
-          const hStartX = placed.direction === 'horizontal'
-            ? placed.startX + pi - ei
-            : placed.startX - ei;
-          const hStartY = placed.direction === 'horizontal'
-            ? placed.startY
-            : placed.startY + pi - ei;
+          // Пробуем все направления
+          for (const direction of directions) {
+            const vector = getDirectionVector(direction);
+            
+            // Пробуем clueWidth 1 и 2
+            for (const clueWidth of [1, 2]) {
+              const startX = placed.startX + placedVector.dx * pi - vector.dx * ei;
+              const startY = placed.startY + placedVector.dy * pi - vector.dy * ei;
 
-          if (canPlaceWord(entry, 'horizontal', hStartX, hStartY, grid, placedWords, gridSize)) {
-            // Считаем количество пересечений
-            let intersections = 0;
-            for (let i = 0; i < entry.word.length; i++) {
-              const { x, y } = { x: hStartX + i, y: hStartY };
-              const cell = grid.get(`${x},${y}`);
-              if (cell && cell.letter !== null) intersections++;
+              if (canPlaceWord(entry, direction, startX, startY, clueWidth, grid, placedWords, gridSize)) {
+                // Считаем количество пересечений
+                let intersections = 0;
+                for (let i = 0; i < entry.word.length; i++) {
+                  const x = startX + vector.dx * i;
+                  const y = startY + vector.dy * i;
+                  const cell = grid.get(`${x},${y}`);
+                  if (cell && cell.letter !== null) intersections++;
+                }
+                placements.push({ direction, startX, startY, clueWidth, intersections });
+              }
             }
-            placements.push({ direction: 'horizontal', startX: hStartX, startY: hStartY, intersections });
-          }
-
-          // Попробуем вертикальное размещение
-          const vStartX = placed.direction === 'vertical'
-            ? placed.startX
-            : placed.startX + pi - ei;
-          const vStartY = placed.direction === 'vertical'
-            ? placed.startY + pi - ei
-            : placed.startY;
-
-          if (canPlaceWord(entry, 'vertical', vStartX, vStartY, grid, placedWords, gridSize)) {
-            let intersections = 0;
-            for (let i = 0; i < entry.word.length; i++) {
-              const { x, y } = { x: vStartX, y: vStartY + i };
-              const cell = grid.get(`${x},${y}`);
-              if (cell && cell.letter !== null) intersections++;
-            }
-            placements.push({ direction: 'vertical', startX: vStartX, startY: vStartY, intersections });
           }
         }
       }
@@ -324,10 +344,9 @@ function findPossiblePlacements(
 // Основной генератор
 // ============================================================
 export async function generateCrossword(targetWordCount: number = 15): Promise<CrosswordData> {
-  const gridSize = 30; // Достаточно большая сетка для размещения 15-20 слов
+  const gridSize = 30;
   const maxAttempts = 150;
 
-  // Загружаем слова из базы данных
   const WORD_POOL = await getWordPool();
 
   let bestResult: {
@@ -347,8 +366,7 @@ export async function generateCrossword(targetWordCount: number = 15): Promise<C
     const startX = center - Math.floor(firstWord.word.length / 2);
     const startY = center;
 
-    // Размещаем первое слово
-    placeWordInGrid(firstWord, 'horizontal', startX, startY, grid, `w${placedWords.length + 1}`);
+    placeWordInGrid(firstWord, 'horizontal', startX, startY, 1, grid, `w${placedWords.length + 1}`);
     placedWords.push({
       id: `w${placedWords.length + 1}`,
       word: firstWord.word,
@@ -356,17 +374,13 @@ export async function generateCrossword(targetWordCount: number = 15): Promise<C
       direction: 'horizontal',
       startX,
       startY,
+      clueWidth: 1,
     });
 
     // Пытаемся разместить остальные слова
-    // Сначала длинные (для большего количества пересечений), потом короткие
     const remaining = sorted.slice(1);
-    
-    // Разделяем на длинные (>= 5 букв) и короткие
     const longWords = remaining.filter((w: WordEntry) => w.word.length >= 5);
     const shortWords = remaining.filter((w: WordEntry) => w.word.length < 5);
-    
-    // Перемешиваем внутри каждой группы
     const orderedWords = [...shuffleArray(longWords), ...shuffleArray(shortWords)];
 
     for (const entry of orderedWords) {
@@ -376,7 +390,6 @@ export async function generateCrossword(targetWordCount: number = 15): Promise<C
       if (placements.length === 0) continue;
 
       // Выбираем размещение с наибольшим количеством пересечений, ближе к центру
-      // Длинные слова получают больший приоритет на пересечения
       placements.sort((a, b) => {
         const distA = Math.abs(a.startX - center) + Math.abs(a.startY - center);
         const distB = Math.abs(b.startX - center) + Math.abs(b.startY - center);
@@ -389,7 +402,7 @@ export async function generateCrossword(targetWordCount: number = 15): Promise<C
 
       const best = placements[0];
       const wordId = `w${placedWords.length + 1}`;
-      placeWordInGrid(entry as WordEntry, best.direction, best.startX, best.startY, grid, wordId);
+      placeWordInGrid(entry as WordEntry, best.direction, best.startX, best.startY, best.clueWidth, grid, wordId);
       placedWords.push({
         id: wordId,
         word: (entry as WordEntry).word,
@@ -397,6 +410,7 @@ export async function generateCrossword(targetWordCount: number = 15): Promise<C
         direction: best.direction,
         startX: best.startX,
         startY: best.startY,
+        clueWidth: best.clueWidth,
       });
     }
 
@@ -408,7 +422,6 @@ export async function generateCrossword(targetWordCount: number = 15): Promise<C
   }
 
   if (!bestResult) {
-    // Fallback — пустой кроссворд
     return {
       id: 'crossword-generated',
       title: 'Сканворд',
@@ -424,16 +437,18 @@ export async function generateCrossword(targetWordCount: number = 15): Promise<C
 
 function placeWordInGrid(
   entry: WordEntry,
-  direction: 'horizontal' | 'vertical',
+  direction: WordDirection,
   startX: number,
   startY: number,
+  clueWidth: number,
   grid: Map<string, GridCell>,
   wordId: string
 ): void {
+  const vector = getDirectionVector(direction);
+  
   for (let i = 0; i < entry.word.length; i++) {
-    const { x, y } = direction === 'horizontal'
-      ? { x: startX + i, y: startY }
-      : { x: startX, y: startY + i };
+    const x = startX + vector.dx * i;
+    const y = startY + vector.dy * i;
     const key = `${x},${y}`;
     const existing = grid.get(key);
     if (existing) {
@@ -456,19 +471,25 @@ function buildCrosswordData(
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
 
   for (const pw of placedWords) {
+    const vector = getDirectionVector(pw.direction);
+    
     for (let i = 0; i < pw.word.length; i++) {
-      const { x, y } = getCellCoords(pw, i);
+      const x = pw.startX + vector.dx * i;
+      const y = pw.startY + vector.dy * i;
       minX = Math.min(minX, x);
       maxX = Math.max(maxX, x);
       minY = Math.min(minY, y);
       maxY = Math.max(maxY, y);
     }
-    // Учитываем clue-клетку
-    const clue = getCluePosition(pw);
-    minX = Math.min(minX, clue.x);
-    maxX = Math.max(maxX, clue.x);
-    minY = Math.min(minY, clue.y);
-    maxY = Math.max(maxY, clue.y);
+    
+    // Учитываем clue-клетки
+    const clues = getCluePosition(pw);
+    for (const clue of clues) {
+      minX = Math.min(minX, clue.x);
+      maxX = Math.max(maxX, clue.x);
+      minY = Math.min(minY, clue.y);
+      maxY = Math.max(maxY, clue.y);
+    }
   }
 
   // Смещаем всё так, чтобы начиналось с (0, 0)
@@ -505,10 +526,11 @@ function buildCrosswordData(
 
   // Заполняем буквы слов
   for (const pw of normalizedWords) {
+    const vector = getDirectionVector(pw.direction);
+    
     for (let i = 0; i < pw.word.length; i++) {
-      const { x, y } = pw.direction === 'horizontal'
-        ? { x: pw.startX + i, y: pw.startY }
-        : { x: pw.startX, y: pw.startY + i };
+      const x = pw.startX + vector.dx * i;
+      const y = pw.startY + vector.dy * i;
       const cell = cellMap.get(`${x},${y}`);
       if (cell && cell.type === 'black') {
         cell.type = 'empty';
@@ -519,25 +541,29 @@ function buildCrosswordData(
 
   // Заполняем clue-клетки
   for (const pw of normalizedWords) {
-    const cluePos = pw.direction === 'horizontal'
-      ? { x: pw.startX - 1, y: pw.startY }
-      : { x: pw.startX, y: pw.startY - 1 };
-    const cell = cellMap.get(`${cluePos.x},${cluePos.y}`);
-    if (cell) {
-      cell.type = 'clue';
-      cell.clueText = pw.clue;
-      cell.direction = getDirection({ ...pw, direction: pw.direction } as PlacedWord);
-      cell.targetWordId = pw.id;
+    const clues = getCluePosition(pw);
+    const arrowDirection = getArrowDirection(pw);
+    
+    for (let i = 0; i < clues.length; i++) {
+      const cluePos = clues[i];
+      const cell = cellMap.get(`${cluePos.x},${cluePos.y}`);
+      if (cell) {
+        cell.type = 'clue';
+        cell.clueText = pw.clue;
+        cell.direction = arrowDirection;
+        cell.targetWordId = pw.id;
+      }
     }
   }
 
   // Строим массив слов
   const words: Word[] = normalizedWords.map(pw => {
     const wordCells: string[] = [];
+    const vector = getDirectionVector(pw.direction);
+    
     for (let i = 0; i < pw.word.length; i++) {
-      const { x, y } = pw.direction === 'horizontal'
-        ? { x: pw.startX + i, y: pw.startY }
-        : { x: pw.startX, y: pw.startY + i };
+      const x = pw.startX + vector.dx * i;
+      const y = pw.startY + vector.dy * i;
       wordCells.push(`c${x}-${y}`);
     }
     return {
