@@ -221,7 +221,7 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword, playerColor, p
 
   return (
     <div
-      className="crossword-grid inline-grid gap-[2px] bg-gray-300 dark:bg-gray-700 p-[2px] rounded-lg shadow-inner transition-colors max-w-[90vw] max-h-[80vh] overflow-auto"
+      className="crossword-grid inline-grid gap-[2px] bg-gray-300 dark:bg-gray-700 p-[2px] rounded-lg shadow-inner transition-colors"
       style={{
         gridTemplateColumns: `repeat(${crossword.width}, minmax(40px, 1fr))`,
         gridTemplateRows: `repeat(${crossword.height}, minmax(40px, 1fr))`,

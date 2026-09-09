@@ -185,7 +185,7 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
           readOnly={isSolved}
           tabIndex={isSolved ? -1 : 0}
           maxLength={2}
-          className={`w-full h-full text-center text-3xl font-bold bg-transparent outline-none uppercase cursor-pointer
+          className={`w-full h-full text-center text-xl font-bold bg-transparent outline-none uppercase cursor-pointer
             ${isSolved ? 'text-green-700 dark:text-green-400' : ''}
           `}
           style={{

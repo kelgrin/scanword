@@ -274,7 +274,7 @@ function findPossiblePlacements(
 }
 
 export async function generateCrossword(targetWordCount: number = 20): Promise<CrosswordData> {
-  const gridSize = 25;
+  const gridSize = 20;
   const maxAttempts = 200;
 
   const WORD_POOL = await getWordPool();
@@ -317,13 +317,43 @@ export async function generateCrossword(targetWordCount: number = 20): Promise<C
       if (placements.length === 0) continue;
 
       placements.sort((a, b) => {
+        // Приоритет пересечениям
+        if (a.intersections !== b.intersections) {
+          return b.intersections - a.intersections;
+        }
+        
+        // Затем близость к центру
         const distA = Math.abs(a.startX - center) + Math.abs(a.startY - center);
         const distB = Math.abs(b.startX - center) + Math.abs(b.startY - center);
-        const wordLength = entry.word.length;
-        const intersectionWeight = wordLength >= 6 ? 3 : wordLength >= 4 ? 2 : 1;
-        const scoreA = a.intersections * intersectionWeight - distA * 0.1;
-        const scoreB = b.intersections * intersectionWeight - distB * 0.1;
-        return scoreB - scoreA;
+        
+        // Близость к уже размещённым словам (компактность)
+        const avgDistToPlacedA = placedWords.length > 0 
+          ? placedWords.reduce((sum, pw) => {
+              const pwCenterX = pw.startX + pw.word.length / 2;
+              const pwCenterY = pw.startY + pw.word.length / 2;
+              const aCenterX = a.startX + entry.word.length / 2;
+              const aCenterY = a.startY + entry.word.length / 2;
+              return sum + Math.abs(aCenterX - pwCenterX) + Math.abs(aCenterY - pwCenterY);
+            }, 0) / placedWords.length
+          : 0;
+        
+        const avgDistToPlacedB = placedWords.length > 0
+          ? placedWords.reduce((sum, pw) => {
+              const pwCenterX = pw.startX + pw.word.length / 2;
+              const pwCenterY = pw.startY + pw.word.length / 2;
+              const bCenterX = b.startX + entry.word.length / 2;
+              const bCenterY = b.startY + entry.word.length / 2;
+              return sum + Math.abs(bCenterX - pwCenterX) + Math.abs(bCenterY - pwCenterY);
+            }, 0) / placedWords.length
+          : 0;
+        
+        const compactnessA = avgDistToPlacedA * 0.5;
+        const compactnessB = avgDistToPlacedB * 0.5;
+        
+        const scoreA = distA * 0.3 + compactnessA;
+        const scoreB = distB * 0.3 + compactnessB;
+        
+        return scoreA - scoreB;
       });
 
       const best = placements[0];
