@@ -8,6 +8,30 @@ interface WordListProps {
 
 const WordList: React.FC<WordListProps> = ({ words }) => {
   const storeWords = useCrosswordStore((s) => s.words);
+  const cells = useCrosswordStore((s) => s.cells);
+  const setActiveCell = useCrosswordStore((s) => s.setActiveCell);
+  const setActiveWord = useCrosswordStore((s) => s.setActiveWord);
+
+  const handleWordClick = (word: Word) => {
+    // Находим первую свободную клетку в этом слове
+    const firstEmptyCellId = word.cells.find((cellId) => {
+      const cell = cells.find((c) => c.id === cellId);
+      return cell && cell.type === 'empty' && !cell.userInput;
+    });
+
+    // Если есть свободная клетка, устанавливаем её как активную
+    if (firstEmptyCellId) {
+      setActiveWord(word.id);
+      setActiveCell(firstEmptyCellId, word.id);
+    } else {
+      // Если все клетки заполнены, устанавливаем первую клетку
+      const firstCellId = word.cells[0];
+      if (firstCellId) {
+        setActiveWord(word.id);
+        setActiveCell(firstCellId, word.id);
+      }
+    }
+  };
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 sticky top-24 transition-colors">
@@ -22,10 +46,11 @@ const WordList: React.FC<WordListProps> = ({ words }) => {
           return (
             <div
               key={word.id}
-              className={`p-2 rounded-lg text-sm transition-colors ${
+              onClick={() => handleWordClick(word)}
+              className={`p-2 rounded-lg text-sm transition-all cursor-pointer hover:shadow-md ${
                 isSolved
-                  ? 'bg-green-50 border border-green-200 dark:bg-green-900/20 dark:border-green-700'
-                  : 'bg-gray-50 border border-gray-100 dark:bg-gray-700 dark:border-gray-600'
+                  ? 'bg-green-50 border border-green-200 dark:bg-green-900/20 dark:border-green-700 hover:border-green-400'
+                  : 'bg-gray-50 border border-gray-100 dark:bg-gray-700 dark:border-gray-600 hover:border-blue-400'
               }`}
             >
               <div className="flex items-start gap-2">

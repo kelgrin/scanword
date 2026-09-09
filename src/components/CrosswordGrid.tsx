@@ -110,6 +110,13 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword, playerColor, p
       const letter = value.toUpperCase().slice(-1);
       if (!/[А-ЯЁA-Z]/.test(letter)) return;
 
+      // Check if cell already has a letter from another player
+      const cell = cells.find((c) => c.id === cellId);
+      if (cell && cell.userInput && playerId && cell.playerId && cell.playerId !== playerId) {
+        // Cell has a letter from another player - cannot overwrite
+        return;
+      }
+
       setInput(cellId, letter, playerColor, playerId);
 
       // Auto-advance to next EMPTY cell — skip filled cells
@@ -123,7 +130,7 @@ const CrosswordGrid: React.FC<CrosswordGridProps> = ({ crossword, playerColor, p
         }
       }
     },
-    [setInput, getNextEmptyCellInWord, setActiveCell, playerColor, playerId]
+    [setInput, getNextEmptyCellInWord, setActiveCell, playerColor, playerId, cells]
   );
 
   // Handle keyboard events

@@ -91,16 +91,26 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
 
     const getDirectionIcon = () => {
       if (!cell.direction) return null;
-      const iconSize = 12;
+      const iconSize = 14;
       switch (cell.direction) {
-        case 'up':
-          return <ArrowUp size={iconSize} className="text-gray-500" />;
-        case 'down':
-          return <ArrowDown size={iconSize} className="text-gray-500" />;
-        case 'left':
-          return <ArrowLeft size={iconSize} className="text-gray-500" />;
         case 'right':
-          return <ArrowRight size={iconSize} className="text-gray-500" />;
+          return <ArrowRight size={iconSize} className="text-gray-600 dark:text-gray-300" strokeWidth={2.5} />;
+        case 'down':
+          return <ArrowDown size={iconSize} className="text-gray-600 dark:text-gray-300" strokeWidth={2.5} />;
+        case 'left':
+          return <ArrowLeft size={iconSize} className="text-gray-600 dark:text-gray-300" strokeWidth={2.5} />;
+        case 'up':
+          return <ArrowUp size={iconSize} className="text-gray-600 dark:text-gray-300" strokeWidth={2.5} />;
+        case 'up-right':
+          return <ArrowUp size={iconSize} className="text-gray-600 dark:text-gray-300 rotate-45" strokeWidth={2.5} />;
+        case 'up-left':
+          return <ArrowUp size={iconSize} className="text-gray-600 dark:text-gray-300 -rotate-45" strokeWidth={2.5} />;
+        case 'down-right':
+          return <ArrowDown size={iconSize} className="text-gray-600 dark:text-gray-300 -rotate-45" strokeWidth={2.5} />;
+        case 'down-left':
+          return <ArrowDown size={iconSize} className="text-gray-600 dark:text-gray-300 rotate-45" strokeWidth={2.5} />;
+        default:
+          return null;
       }
     };
 
