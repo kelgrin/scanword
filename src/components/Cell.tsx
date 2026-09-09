@@ -101,6 +101,14 @@ const Cell = forwardRef<HTMLInputElement, CellProps>(
           return <ArrowLeft size={iconSize} className="text-gray-600 dark:text-gray-300" strokeWidth={2.5} />;
         case 'up':
           return <ArrowUp size={iconSize} className="text-gray-600 dark:text-gray-300" strokeWidth={2.5} />;
+        case 'up-right':
+          return <ArrowUp size={iconSize} className="text-gray-600 dark:text-gray-300 rotate-45" strokeWidth={2.5} />;
+        case 'up-left':
+          return <ArrowUp size={iconSize} className="text-gray-600 dark:text-gray-300 -rotate-45" strokeWidth={2.5} />;
+        case 'down-right':
+          return <ArrowDown size={iconSize} className="text-gray-600 dark:text-gray-300 -rotate-45" strokeWidth={2.5} />;
+        case 'down-left':
+          return <ArrowDown size={iconSize} className="text-gray-600 dark:text-gray-300 rotate-45" strokeWidth={2.5} />;
         default:
           return null;
       }

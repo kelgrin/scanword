@@ -259,15 +259,49 @@ function canPlaceWord(
       }
       // Если letter === null, это clue-клетка - можно размещать слово через неё
     }
-
-    // Убираем строгую проверку соседей для пустых клеток
-    // В сканворде слова могут быть близко друг к другу
-    // Проверка клеток ДО и ПОСЛЕ слова ниже обеспечит, что слова не слипаются
   }
 
-  // УБРАЛИ проверку клеток ДО и ПОСЛЕ слова
-  // В сканворде слова могут быть близко друг к другу
-  // Это было главной причиной почему генерировалось только одно слово
+  // ВАЖНО: Проверяем, что на одной линии нет двух слов в одном направлении
+  // На одной линии до упора в неактивный блок может быть только одно слово
+  for (const pw of placedWords) {
+    const pwVector = getWordDirectionVector(pw.direction);
+    
+    // Проверяем только если оба слова в одном направлении
+    if (pw.direction === direction) {
+      // Проверяем, находятся ли слова на одной линии
+      if (direction === 'horizontal') {
+        // Оба горизонтальные - проверяем, на одной ли они строке
+        if (pw.startY === startY) {
+          // На одной строке - проверяем, не продолжаются ли они
+          const pwEndX = pw.startX + pw.word.length - 1;
+          const wordEndX = startX + len - 1;
+          
+          // Если слова на одной строке и не пересекаются - это ошибка
+          if (!hasIntersection) {
+            // Проверяем, не идут ли они подряд
+            if ((pwEndX + 1 === startX) || (wordEndX + 1 === pw.startX)) {
+              return false; // Слова идут подряд на одной линии
+            }
+          }
+        }
+      } else if (direction === 'vertical') {
+        // Оба вертикальные - проверяем, на одном ли они столбце
+        if (pw.startX === startX) {
+          // На одном столбце - проверяем, не продолжаются ли они
+          const pwEndY = pw.startY + pw.word.length - 1;
+          const wordEndY = startY + len - 1;
+          
+          // Если слова на одном столбце и не пересекаются - это ошибка
+          if (!hasIntersection) {
+            // Проверяем, не идут ли они подряд
+            if ((pwEndY + 1 === startY) || (wordEndY + 1 === pw.startY)) {
+              return false; // Слова идут подряд на одной линии
+            }
+          }
+        }
+      }
+    }
+  }
   
   return true;
 }
@@ -562,8 +596,8 @@ function buildCrosswordData(
   // Заполняем clue-клетки
   for (const pw of normalizedWords) {
     const clues = getCluePosition(pw);
-    // Стрелка указывает НАПРАВЛЕНИЕ СЛОВА, а не от clue-клетки
-    const arrowDirection = pw.direction === 'horizontal' ? 'right' : 'down';
+    // Стрелка указывает ОТ clue-клетки К первой букве слова
+    const arrowDirection = pw.clueDirection;
     
     for (let i = 0; i < clues.length; i++) {
       const cluePos = clues[i];
