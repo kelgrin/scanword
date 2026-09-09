@@ -243,9 +243,8 @@ function canPlaceWord(
         // Клетка уже содержит букву — должно быть пересечение
         if (cell.letter !== letter) return false;
         hasIntersection = true;
-      } else {
-        return false;
       }
+      // Если letter === null, это clue-клетка - можно размещать слово через неё
     }
 
     // Проверяем соседние клетки (не должны быть буквами, кроме как продолжение слова)
@@ -544,7 +543,8 @@ function buildCrosswordData(
   // Заполняем clue-клетки
   for (const pw of normalizedWords) {
     const clues = getCluePosition(pw);
-    const arrowDirection = pw.clueDirection as Direction;
+    // Стрелка указывает НАПРАВЛЕНИЕ СЛОВА, а не от clue-клетки
+    const arrowDirection = pw.direction === 'horizontal' ? 'right' : 'down';
     
     for (let i = 0; i < clues.length; i++) {
       const cluePos = clues[i];
