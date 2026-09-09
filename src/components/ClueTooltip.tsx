@@ -26,11 +26,15 @@ const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) =>
     
     const fetchAnimeImage = async () => {
       try {
+        // Добавляем timestamp для уникальности каждой картинки
+        const timestamp = Date.now();
+        const random = Math.random();
+        
         // Используем несколько API для hentai anime girl
         const apis = [
-          'https://api.waifu.pics/nsfw/waifu',
-          'https://nekos.life/api/v2/img/lewd',
-          'https://moe.jitsu.top/img/?sort=setu&size=mw1024'
+          `https://api.waifu.pics/nsfw/waifu?timestamp=${timestamp}`,
+          `https://nekos.life/api/v2/img/lewd?timestamp=${timestamp}`,
+          `https://moe.jitsu.top/img/?sort=setu&size=mw1024&timestamp=${timestamp}&random=${random}`
         ];
         
         for (const api of apis) {
@@ -52,7 +56,7 @@ const ClueTooltip: React.FC<ClueTooltipProps> = ({ text, wordText, onClose }) =>
     };
 
     fetchAnimeImage();
-  }, [showAnimeMode]);
+  }, [showAnimeMode, wordText]); // Добавили wordText в зависимости
 
   // Сохранение настройки
   useEffect(() => {
